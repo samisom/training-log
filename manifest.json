@@ -1,0 +1,9 @@
+{
+  "name": "PT Workout Logger",
+  "short_name": "Workout Log",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f7f8fb",
+  "theme_color": "#101828",
+  "icons": []
+}

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101828">
+  <title>PT Workout Logger</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="config.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">Client workout entry</p>
+      <h1>PT Workout Logger</h1>
+    </div>
+    <div id="connectionStatus" class="status-pill" aria-live="polite">Demo mode</div>
+  </header>
+
+  <main>
+    <section class="panel setup-panel" aria-labelledby="setupTitle">
+      <div class="panel-title-row">
+        <div>
+          <h2 id="setupTitle">Google Sheet connection</h2>
+          <p>Paste a client Sheet URL or ID once. It is saved only in this browser.</p>
+        </div>
+      </div>
+      <div class="setup-grid">
+        <label>
+          Client Sheet ID or URL
+          <input id="sheetIdInput" inputmode="url" autocomplete="off" placeholder="https://docs.google.com/spreadsheets/d/...">
+        </label>
+        <button id="saveSheetIdBtn" type="button">Save Sheet ID</button>
+        <button id="authorizeBtn" type="button">Connect Google</button>
+        <button id="loadSheetBtn" type="button">Load Sheet</button>
+        <button id="forgetSheetBtn" type="button" class="ghost">Forget Sheet</button>
+      </div>
+      <p id="setupMessage" class="message" role="status"></p>
+    </section>
+
+    <section class="panel entry-panel" aria-labelledby="entryTitle">
+      <div class="panel-title-row">
+        <div>
+          <h2 id="entryTitle">Session entry</h2>
+          <p id="sessionHelp">Choose a session to filter the exercise dropdowns.</p>
+        </div>
+        <div class="entry-actions top-actions">
+          <button id="addRowBtn" type="button">Add row</button>
+          <button id="saveRowsBtn" type="button" class="primary">Save to Sheet</button>
+        </div>
+      </div>
+
+      <div class="entry-controls">
+        <label>
+          Date
+          <input id="dateInput" type="date">
+        </label>
+        <label>
+          Session
+          <select id="sessionSelect"></select>
+        </label>
+        <label>
+          Bodyweight (kg)
+          <input id="bodyweightInput" type="number" min="0" step="0.1" placeholder="Optional">
+        </label>
+        <label>
+          Default tempo
+          <input id="tempoDefaultInput" type="text" placeholder="e.g. 31X0">
+        </label>
+      </div>
+
+      <div class="table-scroll" role="region" aria-label="Workout log rows" tabindex="0">
+        <table id="entryTable">
+          <thead>
+            <tr>
+              <th>Exercise</th>
+              <th>Variation</th>
+              <th>Set</th>
+              <th>Load kg</th>
+              <th>Reps</th>
+              <th>Tempo</th>
+              <th>RPE</th>
+              <th>Rest s</th>
+              <th>Last load x reps</th>
+              <th>Target load x reps</th>
+              <th>PR?</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="entryBody"></tbody>
+        </table>
+      </div>
+
+      <div class="footer-bar">
+        <p id="entrySummary">0 rows ready.</p>
+        <div class="entry-actions">
+          <button id="addFiveRowsBtn" type="button" class="ghost">Add 5 rows</button>
+          <button id="clearRowsBtn" type="button" class="ghost">Clear unsaved rows</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel meta-panel" aria-labelledby="metaTitle">
+      <h2 id="metaTitle">Exercise context</h2>
+      <div id="exerciseMeta" class="meta-grid">
+        <p>Select an exercise row to see primary muscle, secondary muscle, movement pattern, equipment, limb type, difficulty, base fatigue score, and variation lineage.</p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
