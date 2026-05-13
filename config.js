@@ -1,6 +1,6 @@
 window.WORKOUT_APP_CONFIG = {
   APP_NAME: 'PT Workout Logger',
-  GOOGLE_CLIENT_ID: 'PASTE_YOUR_GOOGLE_OAUTH_WEB_CLIENT_ID_HERE.apps.googleusercontent.com',
+  GOOGLE_CLIENT_ID: '923710834899-14d19addl44a6ju5i2dm8ijdiuer6j1t.apps.googleusercontent.com',
   SHEETS_SCOPE: 'https://www.googleapis.com/auth/spreadsheets',
   DEFAULT_ROWS: 8,
   RANGES: {
