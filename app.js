@@ -11,6 +11,7 @@
     accessToken: '',
     sheetId: '',
     exercises: [],
+    seedExercises: [],
     prRows: [],
     logRows: [],
     selectedExercise: null,
@@ -29,6 +30,7 @@
     restoreSheetId();
     renderSessionOptions();
     attachEvents();
+    ensureQuickUI();
     loadSeedExercises();
     waitForGoogleIdentity();
     registerServiceWorker();
@@ -56,12 +58,232 @@
       'clearRowsBtn',
       'entryBody',
       'entrySummary',
-      'exerciseMeta'
+      'exerciseMeta',
+      'quickEntryList',
+      'mobileSaveBar',
+      'mobileSaveBtn'
     ];
 
     ids.forEach((id) => {
       els[id] = document.getElementById(id);
     });
+    // also refresh mobile quick-entry selects
+    refreshQuickExerciseSelects();
+  }
+
+  /* Quick-entry (mobile) helpers */
+  function ensureQuickUI() {
+    const container = els.quickEntryList;
+    if (!container) return;
+    // create header with add button and summary
+    let header = container.querySelector('.quick-entry-header');
+    if (!header) {
+      header = document.createElement('div');
+      header.className = 'quick-entry-header';
+      const btn = document.createElement('button');
+      btn.id = 'addQuickExerciseBtn';
+      btn.type = 'button';
+      btn.className = 'primary';
+      btn.textContent = 'Add exercise';
+      btn.addEventListener('click', () => addQuickExerciseCard());
+      const summary = document.createElement('div');
+      summary.id = 'quickEntrySummary';
+      summary.style.marginLeft = '8px';
+      header.appendChild(btn);
+      header.appendChild(summary);
+      container.appendChild(header);
+    }
+  }
+
+  function addQuickExerciseCard() {
+    const container = els.quickEntryList;
+    if (!container) return null;
+    const card = createQuickExerciseCard();
+    container.appendChild(card);
+    refreshQuickExerciseSelects();
+    updateQuickReadyCount();
+    return card;
+  }
+
+  function createQuickExerciseCard() {
+    const card = document.createElement('div');
+    card.className = 'quick-card';
+    card.innerHTML = `
+      <div class="exercise-row">
+        <label>Exercise
+          <select class="quick-exercise-select"></select>
+        </label>
+        <div class="readouts">
+          <div class="quick-readout-item">
+            <span>Last:</span>
+            <div class="quick-last-readout">-</div>
+          </div>
+          <div class="quick-readout-item">
+            <span>Target:</span>
+            <div class="quick-target-readout">-</div>
+          </div>
+          <div style="margin-left:auto"><button type="button" class="remove-card quick-remove-card-btn">Remove</button></div>
+        </div>
+        <div class="readout-helper">Last = most recent logged set. Target = PR load +5% and PR reps +1.</div>
+        <div class="sets-control">
+          <label>Sets
+            <select class="quick-set-count" aria-label="Sets count">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3" selected>3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+            </select>
+          </label>
+        </div>
+        <div class="set-rows">
+          <div class="quick-set-list"></div>
+        </div>
+        <details>
+          <summary>Notes / tempo / variation</summary>
+          <label>Tempo<input class="quick-tempo-input" type="text" placeholder="e.g. 31X0"></label>
+          <label>Variation<input class="quick-variation-input" type="text" placeholder="Optional"></label>
+          <label>Notes<textarea class="quick-notes-input" rows="3" placeholder="Cues or notes"></textarea></label>
+        </details>
+      </div>
+    `;
+    // initial set rows
+    renderQuickSetRows(card, 3);
+    return card;
+  }
+
+  function renderQuickSetRows(card, setCount) {
+    const list = card.querySelector('.quick-set-list');
+    if (!list) return;
+    // preserve existing values
+    const existing = Array.from(list.querySelectorAll('.set-row')).map((row) => ({
+      load: row.querySelector('.quick-load-input') ? row.querySelector('.quick-load-input').value : '',
+      reps: row.querySelector('.quick-reps-input') ? row.querySelector('.quick-reps-input').value : ''
+    }));
+    list.innerHTML = '';
+    for (let i = 0; i < setCount; i += 1) {
+      const row = document.createElement('div');
+      row.className = 'set-row';
+      const label = document.createElement('span');
+      label.className = 'set-label';
+      label.textContent = String(i + 1);
+      const load = document.createElement('input');
+      load.type = 'text';
+      load.className = 'quick-load-input';
+      load.placeholder = 'kg/BW';
+      const reps = document.createElement('input');
+      reps.type = 'number';
+      reps.className = 'quick-reps-input';
+      reps.placeholder = 'reps';
+      if (existing[i]) {
+        load.value = existing[i].load;
+        reps.value = existing[i].reps;
+      }
+      row.appendChild(label);
+      row.appendChild(load);
+      row.appendChild(reps);
+      list.appendChild(row);
+    }
+  }
+
+  function refreshQuickExerciseSelects() {
+    let filtered = getFilteredExercises() || [];
+    if (!filtered.length) filtered = state.exercises || [];
+    if (!filtered.length) filtered = state.seedExercises || [];
+    const container = els.quickEntryList;
+    if (!container) return;
+    const selects = container.querySelectorAll('.quick-exercise-select');
+    selects.forEach((select) => {
+      const selected = select.value;
+      const options = ['<option value="">Select exercise</option>']
+        .concat(filtered.map((exercise) => {
+          const label = `${exercise.exercise} - ${exercise.category}`;
+          return `<option value="${escapeAttr(exercise.exercise)}">${escapeHtml(label)}</option>`;
+        }))
+        .join('');
+      select.innerHTML = options;
+      if (selected) {
+        const exists = Array.from(select.options).some((option) => option.value === selected);
+        if (!exists) {
+          const option = document.createElement('option');
+          option.value = selected;
+          option.textContent = `${selected} - outside session filter`;
+          select.appendChild(option);
+        }
+        select.value = selected;
+      }
+      // refresh readouts for this card
+      const card = select.closest('.quick-card');
+      refreshQuickComputedCellsForCard(card);
+    });
+  }
+
+  function refreshQuickComputedCellsForCard(card) {
+    if (!card) return;
+    const exercise = card.querySelector('.quick-exercise-select').value;
+    const variation = card.querySelector('.quick-variation-input').value.trim();
+    const last = findLastUsed(exercise, variation);
+    const target = getTarget(exercise);
+    const lastEl = card.querySelector('.quick-last-readout');
+    const targetEl = card.querySelector('.quick-target-readout');
+    if (lastEl) lastEl.textContent = last || '-';
+    if (targetEl) targetEl.textContent = target || '-';
+    // apply tempo default similar to table flow
+    const tempoInput = card.querySelector('.quick-tempo-input');
+    const pr = findPr(exercise);
+    if (tempoInput && !tempoInput.value) {
+      if (pr && pr.prTempo) tempoInput.value = String(pr.prTempo).toUpperCase();
+      else if (els.tempoDefaultInput && els.tempoDefaultInput.value) tempoInput.value = els.tempoDefaultInput.value.trim().toUpperCase();
+    }
+  }
+
+  function updateQuickReadyCount() {
+    const container = els.quickEntryList;
+    if (!container) return;
+    const exerciseCount = Array.from(container.querySelectorAll('.quick-exercise-select')).filter((s) => s.value).length;
+    const setCount = Array.from(container.querySelectorAll('.set-row')).length;
+    const summary = document.getElementById('quickEntrySummary');
+    if (summary) {
+      if (exerciseCount === 0) {
+        summary.textContent = 'No exercises yet.';
+      } else {
+        summary.textContent = `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}, ${setCount} set${setCount === 1 ? '' : 's'} ready.`;
+      }
+    }
+  }
+
+  function handleQuickChange(event) {
+    const target = event.target;
+    const card = target.closest('.quick-card');
+    if (!card) return;
+    if (target.matches('.quick-exercise-select')) {
+      refreshQuickComputedCellsForCard(card);
+      updateQuickReadyCount();
+    }
+    if (target.matches('.quick-set-count')) {
+      const n = Number(target.value) || 1;
+      renderQuickSetRows(card, n);
+    }
+  }
+
+  function handleQuickInput(event) {
+    const target = event.target;
+    if (!target) return;
+    if (target.matches('.quick-variation-input')) {
+      const card = target.closest('.quick-card');
+      refreshQuickComputedCellsForCard(card);
+    }
+  }
+
+  function handleQuickClick(event) {
+    const btn = event.target.closest('.quick-remove-card-btn');
+    if (btn) {
+      const card = btn.closest('.quick-card');
+      if (card) card.remove();
+      updateQuickReadyCount();
+      return;
+    }
   }
 
   function setAppName() {
@@ -134,23 +356,32 @@
       updateSessionHelp();
       refreshExerciseSelects();
       refreshAllComputedCells();
+      refreshQuickExerciseSelects();
     });
     els.addRowBtn.addEventListener('click', () => addRows(1));
     els.addFiveRowsBtn.addEventListener('click', () => addRows(5));
     els.clearRowsBtn.addEventListener('click', clearRows);
     els.saveRowsBtn.addEventListener('click', saveRows);
+    els.mobileSaveBtn.addEventListener('click', saveRows);
     els.entryBody.addEventListener('input', handleEntryInput);
     els.entryBody.addEventListener('change', handleEntryChange);
     els.entryBody.addEventListener('focusin', handleRowFocus);
     els.entryBody.addEventListener('click', handleEntryClick);
+    if (els.quickEntryList) {
+      els.quickEntryList.addEventListener('change', handleQuickChange);
+      els.quickEntryList.addEventListener('input', handleQuickInput);
+      els.quickEntryList.addEventListener('click', handleQuickClick);
+    }
   }
 
   async function loadSeedExercises() {
     try {
       const response = await fetch('data/exercise-seed.json', { cache: 'no-store' });
       if (!response.ok) throw new Error(`Seed exercise file returned ${response.status}.`);
-      state.exercises = await response.json();
+      state.seedExercises = await response.json();
+      state.exercises = state.seedExercises;
       refreshExerciseSelects();
+      refreshQuickExerciseSelects();
       setConnectionStatus('Demo mode', '');
       updateSessionHelp();
     } catch (error) {
@@ -253,7 +484,13 @@
 
       const data = await sheetsFetch(`/values:batchGet?${params.toString()}`);
       const valueRanges = data.valueRanges || [];
-      state.exercises = parseExercises(valueRanges[0] ? valueRanges[0].values || [] : []);
+      const parsedExercises = parseExercises(valueRanges[0] ? valueRanges[0].values || [] : []);
+      if (parsedExercises.length) {
+        state.exercises = parsedExercises;
+      } else if (state.seedExercises.length) {
+        state.exercises = state.seedExercises;
+        console.warn('Google Sheet returned 0 exercises. Falling back to seed exercises.');
+      }
       state.prRows = parsePrRows(valueRanges[1] ? valueRanges[1].values || [] : []);
       state.logRows = parseLogRows(valueRanges[2] ? valueRanges[2].values || [] : []);
 
@@ -262,9 +499,11 @@
       if (selectedSession) els.sessionSelect.value = selectedSession;
       updateSessionHelp();
       refreshExerciseSelects();
+      refreshQuickExerciseSelects();
       refreshAllComputedCells();
       setConnectionStatus('Sheet loaded', 'connected');
-      setSetupMessage(`Loaded ${state.exercises.length} exercises, ${state.prRows.length} PR rows, and ${state.logRows.length} log rows.`, 'success');
+      const source = parsedExercises.length ? 'sheet' : 'seed fallback';
+      setSetupMessage(`Loaded ${state.exercises.length} exercises from ${source}, ${state.prRows.length} PR rows, and ${state.logRows.length} log rows.`, 'success');
     } catch (error) {
       handleApiError(error, 'Could not load the Google Sheet.');
     } finally {
@@ -421,6 +660,67 @@
         });
       }
     });
+
+    if (els.quickEntryList) {
+      Array.from(els.quickEntryList.querySelectorAll('.quick-card')).forEach((card, cardIndex) => {
+        const exercise = card.querySelector('.quick-exercise-select').value.trim();
+        const variation = card.querySelector('.quick-variation-input').value.trim();
+        const tempoValue = card.querySelector('.quick-tempo-input').value.trim().toUpperCase();
+        const notesValue = card.querySelector('.quick-notes-input').value.trim();
+        const finalTempo = tempoValue || els.tempoDefaultInput.value.trim().toUpperCase();
+        const noteParts = [];
+        if (finalTempo) noteParts.push(`Tempo: ${finalTempo}`);
+        if (variation) noteParts.push(`Variation: ${variation}`);
+        if (notesValue) noteParts.push(`Notes: ${notesValue}`);
+        const finalNotes = noteParts.join(' | ');
+
+        const setRows = Array.from(card.querySelectorAll('.set-row'));
+        const hasAnySetValue = setRows.some((row) => {
+          const loadRaw = String(row.querySelector('.quick-load-input').value || '').trim();
+          const repsRaw = String(row.querySelector('.quick-reps-input').value || '').trim();
+          return loadRaw || repsRaw;
+        });
+        if (!hasAnySetValue) return;
+        if (!exercise) {
+          errors.push(`Quick entry ${cardIndex + 1}: choose an exercise for active sets.`);
+          return;
+        }
+
+        setRows.forEach((row, setIndex) => {
+          const loadRaw = String(row.querySelector('.quick-load-input').value || '').trim();
+          const repsRaw = String(row.querySelector('.quick-reps-input').value || '').trim();
+          if (!loadRaw && !repsRaw) return;
+          if (!loadRaw) errors.push(`Quick entry ${cardIndex + 1}, set ${setIndex + 1}: enter load.`);
+          if (!repsRaw) errors.push(`Quick entry ${cardIndex + 1}, set ${setIndex + 1}: enter reps.`);
+          if (!finalTempo && !els.tempoDefaultInput.value.trim()) errors.push(`Quick entry ${cardIndex + 1}: enter tempo or set a default tempo.`);
+
+          const load = coerceCellValue(loadRaw);
+          const reps = coerceCellValue(repsRaw);
+          const numericLoad = strictNumber(loadRaw);
+          const numericReps = strictNumber(repsRaw);
+          const volume = numericLoad !== null && numericReps !== null ? round(numericLoad * numericReps, 2) : '';
+          const e1rm = numericLoad !== null && numericReps !== null ? round(numericLoad * (1 + numericReps / 30), 2) : '';
+
+          rows.push([
+            date,
+            session,
+            exercise,
+            variation,
+            setIndex + 1,
+            load,
+            reps,
+            finalTempo,
+            '',
+            '',
+            bodyweight,
+            volume,
+            e1rm,
+            '',
+            finalNotes
+          ]);
+        });
+      });
+    }
 
     return { rows, prCandidates, errors };
   }
@@ -782,8 +1082,12 @@
 
   function formatReps(value) {
     if (value === null || value === undefined || value === '') return '- reps';
-    const text = String(value).trim();
+    let text = String(value).trim();
     if (!text) return '- reps';
+    text = text.replace(/\s*,\s*/g, ', ');
+    if (/,/.test(text)) {
+      return /rep/i.test(text) ? text : `${text} reps`;
+    }
     return /rep/i.test(text) ? text : `${formatNumber(value)} reps`;
   }
 
@@ -816,7 +1120,11 @@
 
   function updateReadyCount() {
     const count = Array.from(els.entryBody.querySelectorAll('.exercise-select')).filter((select) => select.value).length;
-    els.entrySummary.textContent = `${count} row${count === 1 ? '' : 's'} ready.`;
+    if (count === 0) {
+      els.entrySummary.textContent = 'Ready to log.';
+    } else {
+      els.entrySummary.textContent = `${count} row${count === 1 ? '' : 's'} ready.`;
+    }
   }
 
   function getRanges() {

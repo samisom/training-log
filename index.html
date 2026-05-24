@@ -49,7 +49,7 @@
         </div>
         <div class="entry-actions top-actions">
           <button id="addRowBtn" type="button">Add row</button>
-          <button id="saveRowsBtn" type="button" class="primary">Save to Sheet</button>
+          <button id="saveRowsBtn" type="button" class="primary">Save workout</button>
         </div>
       </div>
 
@@ -72,6 +72,7 @@
         </label>
       </div>
 
+      <div id="quickEntryList" class="quick-entry-list"></div>
       <div class="table-scroll" role="region" aria-label="Workout log rows" tabindex="0">
         <table id="entryTable">
           <thead>
@@ -96,13 +97,17 @@
       </div>
 
       <div class="footer-bar">
-        <p id="entrySummary">0 rows ready.</p>
+        <p id="entrySummary">Ready to log.</p>
         <div class="entry-actions">
           <button id="addFiveRowsBtn" type="button" class="ghost">Add 5 rows</button>
           <button id="clearRowsBtn" type="button" class="ghost">Clear unsaved rows</button>
         </div>
       </div>
     </section>
+
+    <div class="mobile-save-bar" id="mobileSaveBar">
+      <button id="mobileSaveBtn" type="button" class="primary">Save workout</button>
+    </div>
 
     <section class="panel meta-panel" aria-labelledby="metaTitle">
       <h2 id="metaTitle">Exercise context</h2>
