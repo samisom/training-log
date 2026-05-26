@@ -56,7 +56,6 @@
       'sessionSelect',
       'sessionHelp',
       'bodyweightInput',
-      'tempoDefaultInput',
       'addRowBtn',
       'addFiveRowsBtn',
       'saveRowsBtn',
@@ -80,11 +79,11 @@
   function ensureQuickUI() {
     const container = els.quickEntryList;
     if (!container) return;
-    // create header with add button and summary
-    let header = container.querySelector('.quick-entry-header');
-    if (!header) {
-      header = document.createElement('div');
-      header.className = 'quick-entry-header';
+    // create footer with add button and summary
+    let footer = container.querySelector('.quick-entry-footer');
+    if (!footer) {
+      footer = document.createElement('div');
+      footer.className = 'quick-entry-footer';
       const btn = document.createElement('button');
       btn.id = 'addQuickExerciseBtn';
       btn.type = 'button';
@@ -94,17 +93,27 @@
       const summary = document.createElement('div');
       summary.id = 'quickEntrySummary';
       summary.style.marginLeft = '8px';
-      header.appendChild(btn);
-      header.appendChild(summary);
-      container.appendChild(header);
+      footer.appendChild(btn);
+      footer.appendChild(summary);
+      container.appendChild(footer);
     }
+  }
+
+  function getQuickEntryControls() {
+    const container = els.quickEntryList;
+    return container ? container.querySelector('.quick-entry-footer') : null;
   }
 
   function addQuickExerciseCard() {
     const container = els.quickEntryList;
     if (!container) return null;
     const card = createQuickExerciseCard();
-    container.appendChild(card);
+    const controls = getQuickEntryControls();
+    if (controls) {
+      container.insertBefore(card, controls);
+    } else {
+      container.appendChild(card);
+    }
     refreshQuickExerciseSelects();
     updateQuickReadyCount();
     return card;
@@ -234,12 +243,11 @@
     const targetEl = card.querySelector('.quick-target-readout');
     if (lastEl) lastEl.textContent = last || '-';
     if (targetEl) targetEl.textContent = target || '-';
-    // apply tempo default similar to table flow
+    // auto-fill tempo from PR if available
     const tempoInput = card.querySelector('.quick-tempo-input');
     const pr = findPr(exercise);
     if (tempoInput && !tempoInput.value) {
       if (pr && pr.prTempo) tempoInput.value = String(pr.prTempo).toUpperCase();
-      else if (els.tempoDefaultInput && els.tempoDefaultInput.value) tempoInput.value = els.tempoDefaultInput.value.trim().toUpperCase();
     }
   }
 
@@ -376,6 +384,7 @@
 
     clearQuickCards();
 
+    const controls = getQuickEntryControls();
     stored.cards.forEach((cardDraft) => {
       const card = createQuickExerciseCard();
       const exerciseSelect = card.querySelector('.quick-exercise-select');
@@ -402,7 +411,11 @@
         });
       }
 
-      container.appendChild(card);
+      if (controls) {
+        container.insertBefore(card, controls);
+      } else {
+        container.appendChild(card);
+      }
     });
 
     refreshQuickExerciseSelects();
@@ -802,11 +815,10 @@
       if (!setNumber) errors.push(`Row ${index + 1}: enter a set number.`);
       if (!loadRaw) errors.push(`Row ${index + 1}: enter load. Use BW or 0 for bodyweight if needed.`);
       if (!repsRaw) errors.push(`Row ${index + 1}: enter reps.`);
-      if (!tempo && !els.tempoDefaultInput.value.trim()) errors.push(`Row ${index + 1}: enter tempo or set a default tempo.`);
 
       const load = coerceCellValue(loadRaw);
       const reps = coerceCellValue(repsRaw);
-      const finalTempo = tempo || els.tempoDefaultInput.value.trim().toUpperCase();
+      const finalTempo = tempo;
       const numericLoad = strictNumber(loadRaw);
       const numericReps = strictNumber(repsRaw);
       const volume = numericLoad !== null && numericReps !== null ? round(numericLoad * numericReps, 2) : '';
@@ -848,12 +860,8 @@
         const variation = card.querySelector('.quick-variation-input').value.trim();
         const tempoValue = card.querySelector('.quick-tempo-input').value.trim().toUpperCase();
         const notesValue = card.querySelector('.quick-notes-input').value.trim();
-        const finalTempo = tempoValue || els.tempoDefaultInput.value.trim().toUpperCase();
-        const noteParts = [];
-        if (finalTempo) noteParts.push(`Tempo: ${finalTempo}`);
-        if (variation) noteParts.push(`Variation: ${variation}`);
-        if (notesValue) noteParts.push(`Notes: ${notesValue}`);
-        const finalNotes = noteParts.join(' | ');
+        const finalTempo = tempoValue;
+        const finalNotes = notesValue;
 
         const setRows = Array.from(card.querySelectorAll('.set-row'));
         const hasAnySetValue = setRows.some((row) => {
@@ -873,7 +881,6 @@
           if (!loadRaw && !repsRaw) return;
           if (!loadRaw) errors.push(`Quick entry ${cardIndex + 1}, set ${setIndex + 1}: enter load.`);
           if (!repsRaw) errors.push(`Quick entry ${cardIndex + 1}, set ${setIndex + 1}: enter reps.`);
-          if (!finalTempo && !els.tempoDefaultInput.value.trim()) errors.push(`Quick entry ${cardIndex + 1}: enter tempo or set a default tempo.`);
 
           const load = coerceCellValue(loadRaw);
           const reps = coerceCellValue(repsRaw);
@@ -1055,7 +1062,6 @@
     const pr = findPr(exerciseName);
     const tempoInput = tr.querySelector('.tempo-input');
     if (!tempoInput.value && pr && pr.prTempo) tempoInput.value = String(pr.prTempo).toUpperCase();
-    if (!tempoInput.value && els.tempoDefaultInput.value) tempoInput.value = els.tempoDefaultInput.value.trim().toUpperCase();
   }
 
   function autoSetNumber(tr) {

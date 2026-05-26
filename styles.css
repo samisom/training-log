@@ -467,15 +467,15 @@ th:first-child {
   display: none;
 }
 
-/* Quick-entry header with add button */
-.quick-entry-header {
+/* Quick-entry footer with add button */
+.quick-entry-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.quick-entry-header button {
+.quick-entry-footer button {
   width: auto;
   white-space: nowrap;
 }
