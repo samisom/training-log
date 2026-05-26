@@ -4,6 +4,7 @@
   const CONFIG = window.WORKOUT_APP_CONFIG || {};
   const SHEETS_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
   const STORAGE_KEY = 'ptWorkoutLogger.sheetId';
+  const DRAFT_PREFIX = 'ptWorkoutLogger.draft';
   const DEFAULT_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 
   const state = {
@@ -23,6 +24,9 @@
 
   document.addEventListener('DOMContentLoaded', boot);
 
+  let quickDraftContext = { date: '', session: '' };
+  let draftSaveTimer = null;
+
   function boot() {
     cacheElements();
     setAppName();
@@ -30,6 +34,7 @@
     restoreSheetId();
     renderSessionOptions();
     attachEvents();
+    quickDraftContext = getQuickDraftContext();
     ensureQuickUI();
     loadSeedExercises();
     waitForGoogleIdentity();
@@ -265,6 +270,7 @@
       const n = Number(target.value) || 1;
       renderQuickSetRows(card, n);
     }
+    debounceSaveQuickDraft();
   }
 
   function handleQuickInput(event) {
@@ -274,6 +280,7 @@
       const card = target.closest('.quick-card');
       refreshQuickComputedCellsForCard(card);
     }
+    debounceSaveQuickDraft();
   }
 
   function handleQuickClick(event) {
@@ -282,8 +289,176 @@
       const card = btn.closest('.quick-card');
       if (card) card.remove();
       updateQuickReadyCount();
+      debounceSaveQuickDraft();
       return;
     }
+  }
+
+  function getDraftKey(sheetId, date, session) {
+    const normalizedSheet = String(sheetId || 'no-sheet').trim();
+    const normalizedDate = String(date || '').trim();
+    const normalizedSession = String(session || '').trim();
+    return `${DRAFT_PREFIX}.${normalizedSheet}.${normalizedDate}.${normalizedSession}`;
+  }
+
+  function getQuickDraftContext() {
+    return {
+      sheetId: state.sheetId || 'no-sheet',
+      date: els.dateInput.value || '',
+      session: els.sessionSelect.value || ''
+    };
+  }
+
+  function collectQuickDraft() {
+    const cards = Array.from(els.quickEntryList.querySelectorAll('.quick-card'))
+      .map((card) => {
+        const exercise = card.querySelector('.quick-exercise-select').value.trim();
+        const setCount = Number(card.querySelector('.quick-set-count').value) || 1;
+        const tempo = card.querySelector('.quick-tempo-input').value.trim().toUpperCase();
+        const variation = card.querySelector('.quick-variation-input').value.trim();
+        const notes = card.querySelector('.quick-notes-input').value.trim();
+        const sets = Array.from(card.querySelectorAll('.set-row')).map((row) => ({
+          load: String(row.querySelector('.quick-load-input').value || '').trim(),
+          reps: String(row.querySelector('.quick-reps-input').value || '').trim()
+        }));
+
+        const hasContent = exercise || tempo || variation || notes || sets.some((set) => set.load || set.reps);
+        if (!hasContent) return null;
+
+        return {
+          exercise,
+          setCount,
+          sets,
+          tempo,
+          variation,
+          notes
+        };
+      })
+      .filter(Boolean);
+
+    return { cards };
+  }
+
+  function saveQuickDraft(context) {
+    const draftContext = context || getQuickDraftContext();
+    const key = getDraftKey(draftContext.sheetId, draftContext.date, draftContext.session);
+    const draft = collectQuickDraft();
+    if (!draft.cards.length) {
+      localStorage.removeItem(key);
+      return false;
+    }
+    try {
+      localStorage.setItem(key, JSON.stringify(draft));
+      return true;
+    } catch (error) {
+      console.error('Could not save quick draft', error);
+      return false;
+    }
+  }
+
+  function restoreQuickDraft(context) {
+    const draftContext = context || getQuickDraftContext();
+    const key = getDraftKey(draftContext.sheetId, draftContext.date, draftContext.session);
+    let stored = null;
+
+    try {
+      stored = JSON.parse(localStorage.getItem(key) || 'null');
+    } catch (error) {
+      stored = null;
+    }
+
+    if (!stored || !Array.isArray(stored.cards) || !stored.cards.length) {
+      return false;
+    }
+
+    const container = els.quickEntryList;
+    if (!container) return false;
+
+    clearQuickCards();
+
+    stored.cards.forEach((cardDraft) => {
+      const card = createQuickExerciseCard();
+      const exerciseSelect = card.querySelector('.quick-exercise-select');
+      const setCountSelect = card.querySelector('.quick-set-count');
+      const tempoInput = card.querySelector('.quick-tempo-input');
+      const variationInput = card.querySelector('.quick-variation-input');
+      const notesInput = card.querySelector('.quick-notes-input');
+
+      setCountSelect.value = String(cardDraft.setCount || 1);
+      renderQuickSetRows(card, Number(cardDraft.setCount) || 1);
+      tempoInput.value = cardDraft.tempo || '';
+      variationInput.value = cardDraft.variation || '';
+      notesInput.value = cardDraft.notes || '';
+
+      const setRows = Array.from(card.querySelectorAll('.set-row'));
+      if (Array.isArray(cardDraft.sets)) {
+        cardDraft.sets.forEach((set, index) => {
+          const row = setRows[index];
+          if (!row) return;
+          const loadInput = row.querySelector('.quick-load-input');
+          const repsInput = row.querySelector('.quick-reps-input');
+          if (loadInput) loadInput.value = set.load || '';
+          if (repsInput) repsInput.value = set.reps || '';
+        });
+      }
+
+      container.appendChild(card);
+    });
+
+    refreshQuickExerciseSelects();
+
+    Array.from(container.querySelectorAll('.quick-card')).forEach((card, index) => {
+      const cardDraft = stored.cards[index] || {};
+      const exerciseSelect = card.querySelector('.quick-exercise-select');
+      if (exerciseSelect && cardDraft.exercise) {
+        if (exerciseSelect.value !== cardDraft.exercise) {
+          const option = document.createElement('option');
+          option.value = cardDraft.exercise;
+          option.textContent = `${cardDraft.exercise} - restored`;
+          exerciseSelect.appendChild(option);
+          exerciseSelect.value = cardDraft.exercise;
+        }
+      }
+      refreshQuickComputedCellsForCard(card);
+    });
+
+    updateQuickReadyCount();
+    setSetupMessage('Draft restored', 'success');
+    return true;
+  }
+
+  function clearQuickDraft(context) {
+    const draftContext = context || getQuickDraftContext();
+    const key = getDraftKey(draftContext.sheetId, draftContext.date, draftContext.session);
+    localStorage.removeItem(key);
+  }
+
+  function clearQuickCards() {
+    Array.from(els.quickEntryList.querySelectorAll('.quick-card')).forEach((card) => card.remove());
+    updateQuickReadyCount();
+  }
+
+  function handleDraftContextChange() {
+    const previous = { ...quickDraftContext };
+    const next = getQuickDraftContext();
+    if (previous.date === next.date && previous.session === next.session && previous.sheetId === next.sheetId) {
+      return;
+    }
+
+    saveQuickDraft(previous);
+    quickDraftContext = next;
+    restoreQuickDraft(next);
+  }
+
+  function debounceSaveQuickDraft() {
+    if (draftSaveTimer) {
+      clearTimeout(draftSaveTimer);
+    }
+    draftSaveTimer = setTimeout(() => {
+      if (saveQuickDraft()) {
+        setSetupMessage('Draft saved', 'success');
+      }
+    }, 300);
   }
 
   function setAppName() {
@@ -357,7 +532,9 @@
       refreshExerciseSelects();
       refreshAllComputedCells();
       refreshQuickExerciseSelects();
+      handleDraftContextChange();
     });
+    els.dateInput.addEventListener('change', handleDraftContextChange);
     els.addRowBtn.addEventListener('click', () => addRows(1));
     els.addFiveRowsBtn.addEventListener('click', () => addRows(5));
     els.clearRowsBtn.addEventListener('click', clearRows);
@@ -384,6 +561,7 @@
       refreshQuickExerciseSelects();
       setConnectionStatus('Demo mode', '');
       updateSessionHelp();
+      restoreQuickDraft();
     } catch (error) {
       console.warn(error);
       setSetupMessage('Seed exercises could not be loaded. Connect a Google Sheet to continue.', 'error');
@@ -504,6 +682,7 @@
       setConnectionStatus('Sheet loaded', 'connected');
       const source = parsedExercises.length ? 'sheet' : 'seed fallback';
       setSetupMessage(`Loaded ${state.exercises.length} exercises from ${source}, ${state.prRows.length} PR rows, and ${state.logRows.length} log rows.`, 'success');
+      restoreQuickDraft();
     } catch (error) {
       handleApiError(error, 'Could not load the Google Sheet.');
     } finally {
@@ -539,8 +718,10 @@
       const prUpdateCount = await updatePrRows(collected.prCandidates);
       await loadSheetData();
       clearRows();
+      clearQuickDraft();
+      clearQuickCards();
       addRows(Number(CONFIG.DEFAULT_ROWS || 8));
-      setSetupMessage(`Saved ${collected.rows.length} rows.${prUpdateCount ? ` Updated ${prUpdateCount} PR row(s).` : ''}`, 'success');
+      setSetupMessage(`Saved ${collected.rows.length} rows.${prUpdateCount ? ` Updated ${prUpdateCount} PR row(s).` : ''} Draft cleared after save.`, 'success');
     } catch (error) {
       handleApiError(error, 'Could not save rows to the Google Sheet.');
     } finally {
