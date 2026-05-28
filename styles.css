@@ -172,7 +172,7 @@ main {
 }
 
 .entry-controls {
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   margin-bottom: 14px;
 }
 
@@ -182,6 +182,94 @@ label {
   color: #344054;
   font-size: 0.86rem;
   font-weight: 800;
+}
+
+.muscle-filter-label {
+  position: relative;
+}
+
+.muscle-filter-dropdown {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px 12px;
+  background: #fff;
+}
+
+.muscle-filter-dropdown summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.muscle-filter-dropdown summary::-webkit-details-marker {
+  display: none;
+}
+
+.muscle-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.muscle-filter-actions button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 999px;
+}
+
+.muscle-group-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.muscle-group-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--soft);
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.muscle-group-options input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.muscle-filter-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .muscle-filter-dropdown {
+    padding: 8px;
+  }
+
+  .muscle-filter-dropdown summary {
+    width: 100%;
+  }
+
+  .muscle-group-options {
+    grid-template-columns: 1fr;
+  }
 }
 
 input,

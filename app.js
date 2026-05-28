@@ -17,14 +17,15 @@
     logRows: [],
     selectedExercise: null,
     isSaving: false,
-    isLoading: false
+    isLoading: false,
+    activeMuscleGroups: new Set()
   };
 
   const els = {};
 
   document.addEventListener('DOMContentLoaded', boot);
 
-  let quickDraftContext = { date: '', session: '' };
+  let quickDraftContext = { date: '' };
   let draftSaveTimer = null;
 
   function boot() {
@@ -32,7 +33,6 @@
     setAppName();
     initDate();
     restoreSheetId();
-    renderSessionOptions();
     attachEvents();
     quickDraftContext = getQuickDraftContext();
     ensureQuickUI();
@@ -53,9 +53,11 @@
       'forgetSheetBtn',
       'setupMessage',
       'dateInput',
-      'sessionSelect',
-      'sessionHelp',
       'bodyweightInput',
+      'muscleGroupSummary',
+      'muscleGroupOptions',
+      'selectAllMuscleGroupsBtn',
+      'clearAllMuscleGroupsBtn',
       'addRowBtn',
       'addFiveRowsBtn',
       'saveRowsBtn',
@@ -202,9 +204,7 @@
   }
 
   function refreshQuickExerciseSelects() {
-    let filtered = getFilteredExercises() || [];
-    if (!filtered.length) filtered = state.exercises || [];
-    if (!filtered.length) filtered = state.seedExercises || [];
+    const filtered = getFilteredExercises() || [];
     const container = els.quickEntryList;
     if (!container) return;
     const selects = container.querySelectorAll('.quick-exercise-select');
@@ -222,7 +222,7 @@
         if (!exists) {
           const option = document.createElement('option');
           option.value = selected;
-          option.textContent = `${selected} - outside session filter`;
+          option.textContent = `${selected} - outside current muscle filter`;
           select.appendChild(option);
         }
         select.value = selected;
@@ -302,18 +302,16 @@
     }
   }
 
-  function getDraftKey(sheetId, date, session) {
+  function getDraftKey(sheetId, date) {
     const normalizedSheet = String(sheetId || 'no-sheet').trim();
     const normalizedDate = String(date || '').trim();
-    const normalizedSession = String(session || '').trim();
-    return `${DRAFT_PREFIX}.${normalizedSheet}.${normalizedDate}.${normalizedSession}`;
+    return `${DRAFT_PREFIX}.${normalizedSheet}.${normalizedDate}`;
   }
 
   function getQuickDraftContext() {
     return {
       sheetId: state.sheetId || 'no-sheet',
-      date: els.dateInput.value || '',
-      session: els.sessionSelect.value || ''
+      date: els.dateInput.value || ''
     };
   }
 
@@ -344,12 +342,12 @@
       })
       .filter(Boolean);
 
-    return { cards };
+    return { cards, activeMuscleGroups: Array.from(state.activeMuscleGroups) };
   }
 
   function saveQuickDraft(context) {
     const draftContext = context || getQuickDraftContext();
-    const key = getDraftKey(draftContext.sheetId, draftContext.date, draftContext.session);
+    const key = getDraftKey(draftContext.sheetId, draftContext.date);
     const draft = collectQuickDraft();
     if (!draft.cards.length) {
       localStorage.removeItem(key);
@@ -366,7 +364,7 @@
 
   function restoreQuickDraft(context) {
     const draftContext = context || getQuickDraftContext();
-    const key = getDraftKey(draftContext.sheetId, draftContext.date, draftContext.session);
+    const key = getDraftKey(draftContext.sheetId, draftContext.date);
     let stored = null;
 
     try {
@@ -377,6 +375,12 @@
 
     if (!stored || !Array.isArray(stored.cards) || !stored.cards.length) {
       return false;
+    }
+
+    if (Array.isArray(stored.activeMuscleGroups)) {
+      state.activeMuscleGroups = new Set(stored.activeMuscleGroups.filter(Boolean));
+      updateMuscleGroupFilterUI();
+      refreshExerciseSelects();
     }
 
     const container = els.quickEntryList;
@@ -442,7 +446,7 @@
 
   function clearQuickDraft(context) {
     const draftContext = context || getQuickDraftContext();
-    const key = getDraftKey(draftContext.sheetId, draftContext.date, draftContext.session);
+    const key = getDraftKey(draftContext.sheetId, draftContext.date);
     localStorage.removeItem(key);
   }
 
@@ -454,7 +458,7 @@
   function handleDraftContextChange() {
     const previous = { ...quickDraftContext };
     const next = getQuickDraftContext();
-    if (previous.date === next.date && previous.session === next.session && previous.sheetId === next.sheetId) {
+    if (previous.date === next.date && previous.sheetId === next.sheetId) {
       return;
     }
 
@@ -496,43 +500,82 @@
     }
   }
 
-  function renderSessionOptions() {
-    const sessions = getSessions();
-    els.sessionSelect.innerHTML = sessions
-      .map((session) => `<option value="${escapeAttr(session.name)}">${escapeHtml(session.name)}</option>`)
-      .join('');
-
-    const preferred = sessions.find((session) => session.name === 'Legs') || sessions[0];
-    if (preferred) els.sessionSelect.value = preferred.name;
-    updateSessionHelp();
+  function getMuscleGroups() {
+    const groups = new Set();
+    (Array.isArray(state.exercises) ? state.exercises : []).forEach((exercise) => {
+      const category = String(exercise.category || '').trim();
+      if (!category) return;
+      groups.add(category);
+    });
+    return Array.from(groups).sort((a, b) => a.localeCompare(b));
   }
 
-  function getSessions() {
-    const configured = Array.isArray(CONFIG.SESSIONS) ? CONFIG.SESSIONS : [];
-    const sessions = configured.length ? configured : [{ name: 'All Exercises', categories: ['*'] }];
-    const seen = new Set();
-    const clean = [];
+  function ensureActiveMuscleGroups() {
+    const groups = getMuscleGroups();
+    const chosen = new Set();
 
-    sessions.forEach((session) => {
-      if (!session || !session.name) return;
-      const key = normalize(session.name);
-      if (seen.has(key)) return;
-      seen.add(key);
-      clean.push({
-        name: String(session.name),
-        categories: Array.isArray(session.categories) && session.categories.length ? session.categories : ['*']
+    if (state.activeMuscleGroups && state.activeMuscleGroups.size) {
+      state.activeMuscleGroups.forEach((group) => {
+        if (groups.includes(group)) chosen.add(group);
       });
-    });
+    }
 
-    state.logRows.forEach((row) => {
-      if (!row.session) return;
-      const key = normalize(row.session);
-      if (seen.has(key)) return;
-      seen.add(key);
-      clean.push({ name: row.session, categories: ['*'] });
-    });
+    if (!chosen.size && groups.length) {
+      groups.forEach((group) => chosen.add(group));
+    }
 
-    return clean;
+    state.activeMuscleGroups = chosen;
+    updateMuscleGroupFilterUI();
+  }
+
+  function updateMuscleGroupFilterUI() {
+    const groups = getMuscleGroups();
+    const options = groups.map((group, index) => {
+      const checked = state.activeMuscleGroups.has(group) ? 'checked' : '';
+      return `
+        <label for="muscleGroupOption${index}">
+          <input id="muscleGroupOption${index}" type="checkbox" value="${escapeAttr(group)}" ${checked}>
+          ${escapeHtml(group)}
+        </label>
+      `;
+    }).join('');
+
+    if (els.muscleGroupOptions) {
+      els.muscleGroupOptions.innerHTML = options || '<p class="muted">No muscle groups available yet.</p>';
+    }
+    if (els.muscleGroupSummary) {
+      const total = groups.length;
+      const selected = state.activeMuscleGroups.size;
+      els.muscleGroupSummary.textContent = selected === total ? `All muscle groups (${total})` : selected > 0 ? `${selected} selected` : 'No muscle groups selected';
+    }
+  }
+
+  function handleMuscleGroupChange(event) {
+    const target = event.target;
+    if (!target || target.type !== 'checkbox') return;
+    const group = String(target.value || '').trim();
+    if (!group) return;
+    if (target.checked) {
+      state.activeMuscleGroups.add(group);
+    } else {
+      state.activeMuscleGroups.delete(group);
+    }
+    updateMuscleGroupFilterUI();
+    refreshExerciseSelects();
+    refreshQuickExerciseSelects();
+    debounceSaveQuickDraft();
+  }
+
+  function setAllMuscleGroups(selectAll) {
+    const groups = getMuscleGroups();
+    state.activeMuscleGroups = new Set();
+    if (selectAll) {
+      groups.forEach((group) => state.activeMuscleGroups.add(group));
+    }
+    updateMuscleGroupFilterUI();
+    refreshExerciseSelects();
+    refreshQuickExerciseSelects();
+    debounceSaveQuickDraft();
   }
 
   function attachEvents() {
@@ -540,14 +583,20 @@
     els.authorizeBtn.addEventListener('click', requestAccessToken);
     els.loadSheetBtn.addEventListener('click', () => loadSheetData());
     els.forgetSheetBtn.addEventListener('click', forgetSheet);
-    els.sessionSelect.addEventListener('change', () => {
-      updateSessionHelp();
-      refreshExerciseSelects();
-      refreshAllComputedCells();
-      refreshQuickExerciseSelects();
-      handleDraftContextChange();
-    });
     els.dateInput.addEventListener('change', handleDraftContextChange);
+    if (els.muscleGroupOptions) {
+      els.muscleGroupOptions.addEventListener('change', handleMuscleGroupChange);
+    }
+    if (els.selectAllMuscleGroupsBtn) {
+      els.selectAllMuscleGroupsBtn.addEventListener('click', () => {
+        setAllMuscleGroups(true);
+      });
+    }
+    if (els.clearAllMuscleGroupsBtn) {
+      els.clearAllMuscleGroupsBtn.addEventListener('click', () => {
+        setAllMuscleGroups(false);
+      });
+    }
     els.addRowBtn.addEventListener('click', () => addRows(1));
     els.addFiveRowsBtn.addEventListener('click', () => addRows(5));
     els.clearRowsBtn.addEventListener('click', clearRows);
@@ -570,10 +619,10 @@
       if (!response.ok) throw new Error(`Seed exercise file returned ${response.status}.`);
       state.seedExercises = await response.json();
       state.exercises = state.seedExercises;
+      ensureActiveMuscleGroups();
       refreshExerciseSelects();
       refreshQuickExerciseSelects();
       setConnectionStatus('Demo mode', '');
-      updateSessionHelp();
       restoreQuickDraft();
     } catch (error) {
       console.warn(error);
@@ -685,10 +734,7 @@
       state.prRows = parsePrRows(valueRanges[1] ? valueRanges[1].values || [] : []);
       state.logRows = parseLogRows(valueRanges[2] ? valueRanges[2].values || [] : []);
 
-      const selectedSession = els.sessionSelect.value;
-      renderSessionOptions();
-      if (selectedSession) els.sessionSelect.value = selectedSession;
-      updateSessionHelp();
+      ensureActiveMuscleGroups();
       refreshExerciseSelects();
       refreshQuickExerciseSelects();
       refreshAllComputedCells();
@@ -789,15 +835,42 @@
 
   function collectRowsForSave() {
     const date = els.dateInput.value;
-    const session = els.sessionSelect.value;
     const bodyweight = valueOrBlank(els.bodyweightInput.value);
     const rows = [];
     const prCandidates = [];
     const errors = [];
+    const activeExerciseNames = [];
 
     if (!date) errors.push('Choose a date first.');
-    if (!session) errors.push('Choose a session first.');
 
+    // First pass: collect all active exercise names from desktop rows
+    Array.from(els.entryBody.querySelectorAll('tr')).forEach((tr) => {
+      const exercise = tr.querySelector('.exercise-select').value.trim();
+      if (exercise) {
+        activeExerciseNames.push(exercise);
+      }
+    });
+
+    // Collect all active exercise names from quick cards
+    if (els.quickEntryList) {
+      Array.from(els.quickEntryList.querySelectorAll('.quick-card')).forEach((card) => {
+        const exercise = card.querySelector('.quick-exercise-select').value.trim();
+        const setRows = Array.from(card.querySelectorAll('.set-row'));
+        const hasAnySetValue = setRows.some((row) => {
+          const loadRaw = String(row.querySelector('.quick-load-input').value || '').trim();
+          const repsRaw = String(row.querySelector('.quick-reps-input').value || '').trim();
+          return loadRaw || repsRaw;
+        });
+        if (hasAnySetValue && exercise) {
+          activeExerciseNames.push(exercise);
+        }
+      });
+    }
+
+    // Calculate workout focus label once
+    const workoutSessionLabel = getWorkoutFocusLabel(activeExerciseNames);
+
+    // Second pass: process desktop rows
     Array.from(els.entryBody.querySelectorAll('tr')).forEach((tr, index) => {
       const exercise = tr.querySelector('.exercise-select').value.trim();
       if (!exercise) return;
@@ -826,7 +899,7 @@
 
       rows.push([
         date,
-        session,
+        workoutSessionLabel,
         exercise,
         variation,
         setNumber,
@@ -854,6 +927,7 @@
       }
     });
 
+    // Third pass: process quick cards
     if (els.quickEntryList) {
       Array.from(els.quickEntryList.querySelectorAll('.quick-card')).forEach((card, cardIndex) => {
         const exercise = card.querySelector('.quick-exercise-select').value.trim();
@@ -891,7 +965,7 @@
 
           rows.push([
             date,
-            session,
+            workoutSessionLabel,
             exercise,
             variation,
             setIndex + 1,
@@ -1021,7 +1095,7 @@
         if (!exists) {
           const option = document.createElement('option');
           option.value = selected;
-          option.textContent = `${selected} - outside session filter`;
+          option.textContent = `${selected} - outside current muscle filter`;
           select.appendChild(option);
         }
         select.value = selected;
@@ -1084,23 +1158,8 @@
   }
 
   function getFilteredExercises() {
-    const session = getSessions().find((item) => item.name === els.sessionSelect.value);
-    if (!session || session.categories.includes('*')) return state.exercises;
-    const allowed = new Set(session.categories.map(normalize));
-    return state.exercises.filter((exercise) => allowed.has(normalize(exercise.category)));
-  }
-
-  function updateSessionHelp() {
-    const session = getSessions().find((item) => item.name === els.sessionSelect.value);
-    if (!session) {
-      els.sessionHelp.textContent = 'Choose a session to filter the exercise dropdowns.';
-      return;
-    }
-    if (session.categories.includes('*')) {
-      els.sessionHelp.textContent = 'This session shows all exercises.';
-      return;
-    }
-    els.sessionHelp.textContent = `This session filters to: ${session.categories.join(', ')}.`;
+    if (!state.activeMuscleGroups || !state.activeMuscleGroups.size) return [];
+    return (state.exercises || []).filter((exercise) => state.activeMuscleGroups.has(String(exercise.category || '').trim()));
   }
 
   function renderExerciseMeta(exercise) {
@@ -1224,6 +1283,57 @@
   function getExercise(exerciseName) {
     const key = normalize(exerciseName);
     return state.exercises.find((row) => normalize(row.exercise) === key) || null;
+  }
+
+  function getExerciseFocusLabel(exerciseName) {
+    const exercise = getExercise(exerciseName);
+    const category = normalize(exercise ? exercise.category : '');
+    const primaryMuscle = safeString(exercise ? exercise.primaryMuscle : '');
+    const labelMap = {
+      'back - vertical pull': 'Back',
+      'back - horizontal pull': 'Back',
+      'chest': 'Chest',
+      'quads': 'Legs',
+      'hamstrings': 'Legs',
+      'glutes & hips': 'Legs',
+      'calves': 'Legs',
+      'shoulders - anterior': 'Ant Delt',
+      'shoulders - lateral': 'Lat Delt',
+      'shoulders - posterior': 'Rear Delt',
+      'biceps': 'Biceps',
+      'triceps': 'Triceps',
+      'forearms & grip': 'Forearms',
+      'core & abs': 'Core'
+    };
+    if (labelMap[category]) return labelMap[category];
+    if (primaryMuscle) return primaryMuscle;
+    return 'General';
+  }
+
+  function getWorkoutFocusLabel(exerciseNames) {
+    // Define the muscle group order
+    const muscleOrder = ['Legs', 'Chest', 'Back', 'Ant Delt', 'Lat Delt', 'Rear Delt', 'Biceps', 'Triceps', 'Forearms', 'Core', 'General'];
+    
+    if (!exerciseNames || exerciseNames.length === 0) return 'General';
+    
+    // Map each exercise to its focus label
+    const labels = exerciseNames.map(name => getExerciseFocusLabel(name));
+    
+    // Get unique labels
+    const uniqueLabels = Array.from(new Set(labels));
+    
+    // Remove 'General' if there are other labels
+    const filteredLabels = uniqueLabels.filter(label => label !== 'General' || uniqueLabels.length === 1);
+    
+    // Sort by the predefined order
+    const sortedLabels = filteredLabels.sort((a, b) => {
+      const indexA = muscleOrder.indexOf(a);
+      const indexB = muscleOrder.indexOf(b);
+      return indexA - indexB;
+    });
+    
+    // Join with ' + '
+    return sortedLabels.join(' + ');
   }
 
   function compareLogRowsNewestFirst(a, b) {

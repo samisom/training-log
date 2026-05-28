@@ -44,8 +44,8 @@
     <section class="panel entry-panel" aria-labelledby="entryTitle">
       <div class="panel-title-row">
         <div>
-          <h2 id="entryTitle">Session entry</h2>
-          <p id="sessionHelp">Choose a session to filter the exercise dropdowns.</p>
+          <h2 id="entryTitle">Workout entry</h2>
+          <p class="panel-help">Use the muscle-group filters to control which exercises appear in new rows. Existing workout rows keep their selected exercises.</p>
         </div>
         <div class="entry-actions top-actions">
           <button id="addRowBtn" type="button">Add row</button>
@@ -58,9 +58,17 @@
           Date
           <input id="dateInput" type="date">
         </label>
-        <label>
-          Session
-          <select id="sessionSelect"></select>
+        <label class="muscle-filter-label">
+          Muscle groups
+          <details class="muscle-filter-dropdown" id="muscleFilterDropdown">
+            <summary id="muscleGroupSummary">Select muscle groups</summary>
+            <div class="muscle-filter-actions">
+              <button id="selectAllMuscleGroupsBtn" type="button">Select all</button>
+              <button id="clearAllMuscleGroupsBtn" type="button" class="ghost">Clear all</button>
+            </div>
+            <div id="muscleGroupOptions" class="muscle-group-options"></div>
+          </details>
+          <p class="muscle-filter-help">Selected muscle groups control which exercises appear in new dropdowns. Already-added exercises stay in your workout.</p>
         </label>
         <label>
           Bodyweight (kg)
