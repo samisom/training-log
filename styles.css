@@ -307,6 +307,10 @@ button:focus-visible {
   color: var(--success);
 }
 
+.message.warning {
+  color: #b54708;
+}
+
 .table-scroll {
   overflow-x: auto;
   border: 1px solid var(--border);
@@ -592,6 +596,51 @@ th:first-child {
   gap: 10px;
 }
 
+.quick-exercise-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quick-exercise-label {
+  display: grid;
+  gap: 6px;
+}
+
+.quick-superset-actions {
+  margin-top: 2px;
+}
+
+.quick-add-superset-btn,
+.quick-remove-superset-btn {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 999px;
+}
+
+.quick-superset-section {
+  border: 1px solid var(--soft);
+  border-radius: 12px;
+  padding: 10px;
+  background: #fbfcfe;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quick-superset-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.quick-superset-title {
+  color: var(--accent);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
 /* Exercise selection */
 .quick-card label {
   font-weight: 800;
@@ -688,11 +737,17 @@ th:first-child {
   gap: 10px;
 }
 
-/* Individual set row - two column layout */
+/* Individual set block and nested drop-set rows */
+.set-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .set-row {
   display: grid;
-  grid-template-columns: 32px 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: 32px 56px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
   align-items: center;
 }
 
@@ -702,6 +757,50 @@ th:first-child {
   font-size: 0.88rem;
   text-align: center;
   line-height: 1.2;
+}
+
+.drop-set-btn,
+.remove-drop-set-btn {
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.drop-set-btn {
+  background: var(--soft);
+  color: var(--ink);
+}
+
+.remove-drop-set-btn {
+  background: #fff;
+  color: var(--danger);
+  border: 1px solid var(--border);
+  min-width: 40px;
+  padding: 0;
+}
+
+.drop-set-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: 40px;
+}
+
+.drop-set-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1fr) 40px;
+  gap: 8px;
+  align-items: center;
+}
+
+.drop-set-label {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .set-row input[type="number"],
@@ -778,6 +877,25 @@ th:first-child {
   font-size: 0.95rem;
   background: #fff;
   color: var(--ink);
+}
+
+/* Superset badge shown on quick cards when group selected */
+.superset-badge {
+  background: #fff8e6;
+  border: 1px solid rgba(37,99,235,0.08);
+  color: #92400e;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 0.78rem;
+}
+
+/* Superset select inside details */
+.quick-superset-select {
+  max-width: 120px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: 8px;
 }
 
 /* Remove card button */
