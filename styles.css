@@ -176,6 +176,33 @@ main {
   margin-bottom: 14px;
 }
 
+.compact-select {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 10px;
+  background: #fff;
+}
+
+.load-control,
+.quick-load-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.load-control .load-input,
+.quick-load-control .quick-load-input {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.load-control .load-unit-select,
+.quick-load-control .quick-load-unit-select {
+  width: 70px;
+  flex: 0 0 70px;
+}
+
 label {
   display: grid;
   gap: 6px;

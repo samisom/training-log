@@ -18,7 +18,8 @@
     selectedExercise: null,
     isSaving: false,
     isLoading: false,
-    activeMuscleGroups: new Set()
+    activeMuscleGroups: new Set(),
+    defaultLoadUnit: 'kg'
   };
 
   const els = {};
@@ -54,6 +55,7 @@
       'setupMessage',
       'dateInput',
       'bodyweightInput',
+      'loadUnitSelect',
       'muscleGroupSummary',
       'muscleGroupOptions',
       'selectAllMuscleGroupsBtn',
@@ -104,6 +106,78 @@
   function getQuickEntryControls() {
     const container = els.quickEntryList;
     return container ? container.querySelector('.quick-entry-footer') : null;
+  }
+
+  function normalizeLoadUnit(unit) {
+    const text = String(unit || '').trim().toLowerCase();
+    return text === 'lb' ? 'lb' : 'kg';
+  }
+
+  function getWorkoutDefaultLoadUnit() {
+    return normalizeLoadUnit(state.defaultLoadUnit || 'kg');
+  }
+
+  function setWorkoutDefaultLoadUnit(unit) {
+    const normalized = normalizeLoadUnit(unit);
+    state.defaultLoadUnit = normalized;
+    if (els.loadUnitSelect) {
+      els.loadUnitSelect.value = normalized;
+    }
+    return normalized;
+  }
+
+  function createLoadUnitSelect(defaultUnit) {
+    const select = document.createElement('select');
+    select.className = 'load-unit-select compact-select';
+    select.setAttribute('aria-label', 'Load unit');
+    select.innerHTML = `
+      <option value="kg">kg</option>
+      <option value="lb">lb</option>
+    `;
+    select.value = normalizeLoadUnit(defaultUnit || getWorkoutDefaultLoadUnit());
+    select.dataset.unit = select.value;
+    select.addEventListener('change', () => {
+      select.dataset.unit = normalizeLoadUnit(select.value);
+    });
+    return select;
+  }
+
+  function createQuickLoadControl(defaultUnit) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'load-control quick-load-control';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'quick-load-input';
+    input.placeholder = 'kg/BW';
+    const unitSelect = createLoadUnitSelect(defaultUnit);
+    unitSelect.classList.add('quick-load-unit-select');
+    wrapper.appendChild(input);
+    wrapper.appendChild(unitSelect);
+    return { wrapper, input, unitSelect };
+  }
+
+  function getRowLoadUnit(select, fallback) {
+    if (!select) return normalizeLoadUnit(fallback || getWorkoutDefaultLoadUnit());
+    const value = select.value || select.dataset.unit || fallback || '';
+    return normalizeLoadUnit(value || getWorkoutDefaultLoadUnit());
+  }
+
+  function convertLoadToKg(loadRaw, unit) {
+    const trimmed = String(loadRaw || '').trim();
+    if (!trimmed) return '';
+
+    const numeric = strictNumber(trimmed);
+    if (numeric === null) return trimmed;
+
+    return normalizeLoadUnit(unit) === 'lb' ? round(numeric / 2.20462, 2) : round(numeric, 2);
+  }
+
+  function formatEnteredLoadNote(loadRaw, unit) {
+    const trimmed = String(loadRaw || '').trim();
+    if (!trimmed || normalizeLoadUnit(unit) !== 'lb') return '';
+    const numeric = strictNumber(trimmed);
+    if (numeric === null) return '';
+    return `Entered: ${trimmed} lb`;
   }
 
   function addQuickExerciseCard() {
@@ -203,10 +277,9 @@
     const label = document.createElement('span');
     label.className = 'drop-set-label';
     label.textContent = `Drop ${dropIndex}`;
-    const load = document.createElement('input');
-    load.type = 'text';
-    load.className = 'quick-load-input';
-    load.placeholder = 'kg/BW';
+    const values = existingValues || {};
+    const loadControl = createQuickLoadControl(values.unit || getWorkoutDefaultLoadUnit());
+    const load = loadControl.input;
     const reps = document.createElement('input');
     reps.type = 'number';
     reps.className = 'quick-reps-input';
@@ -217,12 +290,11 @@
     remove.textContent = '×';
     remove.setAttribute('aria-label', `Remove Drop ${dropIndex}`);
 
-    const values = existingValues || {};
     load.value = values.load || '';
     reps.value = values.reps || '';
 
     row.appendChild(label);
-    row.appendChild(load);
+    row.appendChild(loadControl.wrapper);
     row.appendChild(reps);
     row.appendChild(remove);
     return row;
@@ -241,21 +313,20 @@
     addDrop.className = 'drop-set-btn';
     addDrop.textContent = '+↓';
     addDrop.setAttribute('aria-label', `Add drop set under set ${setNumber}`);
-    const load = document.createElement('input');
-    load.type = 'text';
-    load.className = 'quick-load-input';
-    load.placeholder = 'kg/BW';
+    const values = existingValues || {};
+    const loadControl = createQuickLoadControl(values.unit || getWorkoutDefaultLoadUnit());
+    const load = loadControl.input;
     const reps = document.createElement('input');
     reps.type = 'number';
     reps.className = 'quick-reps-input';
     reps.placeholder = 'reps';
 
-    load.value = existingValues && existingValues.load ? existingValues.load : '';
-    reps.value = existingValues && existingValues.reps ? existingValues.reps : '';
+    load.value = values.load || '';
+    reps.value = values.reps || '';
 
     row.appendChild(label);
     row.appendChild(addDrop);
-    row.appendChild(load);
+    row.appendChild(loadControl.wrapper);
     row.appendChild(reps);
 
     const drops = document.createElement('div');
@@ -299,12 +370,15 @@
     return getQuickSetBlocksFromList(list).map((block) => {
       const mainRow = block.querySelector(':scope > .set-row');
       const dropRows = Array.from(block.querySelectorAll(':scope > .drop-set-list > .drop-set-row'));
+      const mainUnitSelect = mainRow ? mainRow.querySelector('.quick-load-unit-select') : null;
       return {
         load: mainRow ? mainRow.querySelector('.quick-load-input').value : '',
         reps: mainRow ? mainRow.querySelector('.quick-reps-input').value : '',
+        unit: getRowLoadUnit(mainUnitSelect),
         drops: dropRows.map((row) => ({
           load: row.querySelector('.quick-load-input').value || '',
-          reps: row.querySelector('.quick-reps-input').value || ''
+          reps: row.querySelector('.quick-reps-input').value || '',
+          unit: getRowLoadUnit(row.querySelector('.quick-load-unit-select'))
         }))
       };
     });
@@ -408,6 +482,9 @@
     if (target.matches('.quick-exercise-select')) {
       refreshQuickComputedCellsForCard(card);
       updateQuickReadyCount();
+    }
+    if (target.matches('.quick-load-unit-select')) {
+      target.dataset.unit = normalizeLoadUnit(target.value);
     }
     if (target.matches('.quick-set-count')) {
       const n = Number(target.value) || 1;
@@ -542,7 +619,11 @@
       })
       .filter(Boolean);
 
-    return { cards, activeMuscleGroups: Array.from(state.activeMuscleGroups) };
+    return {
+      cards,
+      activeMuscleGroups: Array.from(state.activeMuscleGroups),
+      defaultLoadUnit: getWorkoutDefaultLoadUnit()
+    };
   }
 
   function saveQuickDraft(context) {
@@ -581,6 +662,10 @@
       state.activeMuscleGroups = new Set(stored.activeMuscleGroups.filter(Boolean));
       updateMuscleGroupFilterUI();
       refreshExerciseSelects();
+    }
+
+    if (stored.defaultLoadUnit) {
+      setWorkoutDefaultLoadUnit(stored.defaultLoadUnit);
     }
 
     const container = els.quickEntryList;
@@ -843,6 +928,12 @@
     if (els.clearAllMuscleGroupsBtn) {
       els.clearAllMuscleGroupsBtn.addEventListener('click', () => {
         setAllMuscleGroups(false);
+      });
+    }
+    if (els.loadUnitSelect) {
+      els.loadUnitSelect.addEventListener('change', (event) => {
+        setWorkoutDefaultLoadUnit(event.target.value);
+        debounceSaveQuickDraft();
       });
     }
     els.addRowBtn.addEventListener('click', () => addRows(1));
@@ -1208,6 +1299,7 @@
       const variation = tr.querySelector('.variation-input').value.trim();
       const setNumber = valueOrBlank(tr.querySelector('.set-input').value);
       const loadRaw = tr.querySelector('.load-input').value.trim();
+      const loadUnit = getRowLoadUnit(tr.querySelector('.load-unit-select'));
       const repsRaw = tr.querySelector('.reps-input').value.trim();
       const tempo = tr.querySelector('.tempo-input').value.trim().toUpperCase();
       const rpe = valueOrBlank(tr.querySelector('.rpe-input').value);
@@ -1219,13 +1311,14 @@
       if (!loadRaw) errors.push(`Row ${index + 1}: enter load. Use BW or 0 for bodyweight if needed.`);
       if (!repsRaw) errors.push(`Row ${index + 1}: enter reps.`);
 
-      const load = coerceCellValue(loadRaw);
+      const load = convertLoadToKg(loadRaw, loadUnit);
       const reps = coerceCellValue(repsRaw);
       const finalTempo = tempo;
-      const numericLoad = strictNumber(loadRaw);
+      const numericLoad = typeof load === 'number' ? load : null;
       const numericReps = strictNumber(repsRaw);
       const volume = numericLoad !== null && numericReps !== null ? round(numericLoad * numericReps, 2) : '';
       const e1rm = numericLoad !== null && numericReps !== null ? round(numericLoad * (1 + numericReps / 30), 2) : '';
+      const notesWithLoad = formatEnteredLoadNote(loadRaw, loadUnit);
 
       rows.push([
         date,
@@ -1242,7 +1335,7 @@
         volume,
         e1rm,
         prFlag,
-        notes
+        [notes, notesWithLoad].filter(Boolean).join(' | ')
       ]);
 
       if (prFlag === 'Y' && numericLoad !== null && numericReps !== null) {
@@ -1293,17 +1386,19 @@
             const setData = section.sets[setIndex];
             if (!setData) return;
             const loadRaw = String(setData.load || '').trim();
+            const loadUnit = getRowLoadUnit(null, setData.unit);
             const repsRaw = String(setData.reps || '').trim();
             if (!loadRaw && !repsRaw) return;
             if (!loadRaw) errors.push(`Quick entry ${cardIndex + 1}, set ${setIndex + 1}: enter load.`);
             if (!repsRaw) errors.push(`Quick entry ${cardIndex + 1}, set ${setIndex + 1}: enter reps.`);
 
-            const load = coerceCellValue(loadRaw);
+            const load = convertLoadToKg(loadRaw, loadUnit);
             const reps = coerceCellValue(repsRaw);
-            const numericLoad = strictNumber(loadRaw);
+            const numericLoad = typeof load === 'number' ? load : null;
             const numericReps = strictNumber(repsRaw);
             const volume = numericLoad !== null && numericReps !== null ? round(numericLoad * numericReps, 2) : '';
             const e1rm = numericLoad !== null && numericReps !== null ? round(numericLoad * (1 + numericReps / 30), 2) : '';
+            const notesWithLoad = formatEnteredLoadNote(loadRaw, loadUnit);
 
             rows.push([
               date,
@@ -1320,7 +1415,7 @@
               volume,
               e1rm,
               '',
-              finalNotes
+              [finalNotes, notesWithLoad].filter(Boolean).join(' | ')
             ]);
 
             (setData.drops || []).forEach((drop, dropIndex) => {
@@ -1331,12 +1426,14 @@
                 errors.push(`Quick entry ${cardIndex + 1}, set ${setIndex + 1} drop ${dropIndex + 1}: enter both load and reps.`);
                 return;
               }
-              const dropLoad = coerceCellValue(dropLoadRaw);
+              const dropLoadUnit = getRowLoadUnit(null, drop.unit);
+              const dropLoad = convertLoadToKg(dropLoadRaw, dropLoadUnit);
               const dropReps = coerceCellValue(dropRepsRaw);
-              const dropNumericLoad = strictNumber(dropLoadRaw);
+              const dropNumericLoad = typeof dropLoad === 'number' ? dropLoad : null;
               const dropNumericReps = strictNumber(dropRepsRaw);
               const dropVolume = dropNumericLoad !== null && dropNumericReps !== null ? round(dropNumericLoad * dropNumericReps, 2) : '';
               const dropE1rm = dropNumericLoad !== null && dropNumericReps !== null ? round(dropNumericLoad * (1 + dropNumericReps / 30), 2) : '';
+              const dropNotesWithLoad = formatEnteredLoadNote(dropLoadRaw, dropLoadUnit);
               rows.push([
                 date,
                 workoutSessionLabel,
@@ -1352,7 +1449,7 @@
                 dropVolume,
                 dropE1rm,
                 '',
-                finalNotes
+                [finalNotes, dropNotesWithLoad].filter(Boolean).join(' | ')
               ]);
             });
           });
@@ -1399,6 +1496,10 @@
       autoSetNumber(tr);
     }
 
+    if (target.matches('.load-unit-select')) {
+      target.dataset.unit = normalizeLoadUnit(target.value);
+    }
+
     updateReadyCount();
   }
 
@@ -1442,7 +1543,7 @@
       </td>
       <td><input class="variation-input" type="text" placeholder="Optional" aria-label="Variation"></td>
       <td><input class="set-input compact-input" type="number" min="1" step="1" aria-label="Set"></td>
-      <td><input class="load-input compact-input" inputmode="decimal" placeholder="kg/BW" aria-label="Load kg"></td>
+      <td><div class="load-control"><input class="load-input compact-input" inputmode="decimal" placeholder="kg/BW" aria-label="Load kg"><select class="load-unit-select compact-select" aria-label="Load unit"><option value="kg">kg</option><option value="lb">lb</option></select></div></td>
       <td><input class="reps-input compact-input" inputmode="decimal" placeholder="reps" aria-label="Reps"></td>
       <td><input class="tempo-input compact-input" type="text" placeholder="31X0" aria-label="Tempo"></td>
       <td><input class="rpe-input compact-input" type="number" min="1" max="10" step="0.5" placeholder="RPE" aria-label="RPE"></td>
@@ -1458,6 +1559,10 @@
       <td><input class="notes-input" type="text" placeholder="Cues or notes" aria-label="Notes"></td>
       <td><button class="remove-row-btn" type="button" aria-label="Remove row">X</button></td>
     `;
+    const loadUnitSelect = tr.querySelector('.load-unit-select');
+    if (loadUnitSelect) {
+      loadUnitSelect.value = getWorkoutDefaultLoadUnit();
+    }
     return tr;
   }
 
@@ -1780,9 +1885,10 @@
   function strictNumber(value) {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
     if (value === null || value === undefined) return null;
-    const text = String(value).trim().replace(/kg/gi, '').replace(/,/g, '');
-    if (!/^-?\d+(\.\d+)?$/.test(text)) return null;
-    const numeric = Number(text);
+    const text = String(value).trim().replace(/,/g, '').replace(/\s+/g, '');
+    const match = text.match(/^(-?\d+(?:\.\d+)?)(?:kg|lb)?$/i);
+    if (!match) return null;
+    const numeric = Number(match[1]);
     return Number.isFinite(numeric) ? numeric : null;
   }
 
