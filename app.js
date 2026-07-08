@@ -218,6 +218,9 @@
           <div class="readout-helper">Last = most recent logged set. Target = PR load +5% and PR reps +1.</div>
           <div class="set-rows">
             <div class="quick-set-list"></div>
+            <div class="quick-set-actions">
+              <button type="button" class="add-set-btn" aria-label="Add set">+</button>
+            </div>
           </div>
         </div>
         <div class="quick-superset-actions">
@@ -244,20 +247,11 @@
             </div>
             <div class="set-rows">
               <div class="quick-set-list"></div>
+              <div class="quick-set-actions">
+                <button type="button" class="add-set-btn" aria-label="Add set">+</button>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="sets-control">
-          <label>Sets
-            <select class="quick-set-count" aria-label="Sets count">
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3" selected>3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-              <option value="6">6</option>
-            </select>
-          </label>
         </div>
         <details>
           <summary>Notes / tempo / variation</summary>
@@ -267,7 +261,7 @@
         </details>
       </div>
     `;
-    renderQuickCardSetRows(card, 3);
+    renderQuickCardSetRows(card, 1);
     return card;
   }
 
@@ -307,12 +301,18 @@
     row.className = 'set-row';
     const label = document.createElement('span');
     label.className = 'set-label';
-    label.textContent = String(setNumber);
+    label.textContent = `Set ${setNumber}`;
     const addDrop = document.createElement('button');
     addDrop.type = 'button';
     addDrop.className = 'drop-set-btn';
     addDrop.textContent = '+↓';
     addDrop.setAttribute('aria-label', `Add drop set under set ${setNumber}`);
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'remove-set-btn';
+    remove.textContent = '×';
+    remove.setAttribute('aria-label', `Remove Set ${setNumber}`);
+    remove.hidden = setNumber <= 1;
     const values = existingValues || {};
     const loadControl = createQuickLoadControl(values.unit || getWorkoutDefaultLoadUnit());
     const load = loadControl.input;
@@ -326,6 +326,7 @@
 
     row.appendChild(label);
     row.appendChild(addDrop);
+    row.appendChild(remove);
     row.appendChild(loadControl.wrapper);
     row.appendChild(reps);
 
@@ -340,11 +341,40 @@
     return block;
   }
 
+  function getQuickSetBlocksFromList(list) {
+    if (!list) return [];
+    return Array.from(list.querySelectorAll(':scope > .set-block'));
+  }
+
+  function renumberQuickSetBlocks(list) {
+    if (!list) return;
+    const blocks = getQuickSetBlocksFromList(list);
+    blocks.forEach((block, index) => {
+      const label = block.querySelector('.set-label');
+      if (label) label.textContent = `Set ${index + 1}`;
+      const removeButton = block.querySelector('.remove-set-btn');
+      if (removeButton) {
+        removeButton.hidden = index === 0;
+        removeButton.setAttribute('aria-label', `Remove Set ${index + 1}`);
+      }
+    });
+  }
+
+  function addNormalSetToSection(section) {
+    const list = section ? section.querySelector('.quick-set-list') : null;
+    if (!list) return;
+    const nextSetNumber = getQuickSetBlocksFromList(list).length + 1;
+    list.appendChild(createSetBlock(nextSetNumber, {}));
+    renumberQuickSetBlocks(list);
+    updateQuickReadyCount();
+  }
+
   function renderQuickSetRowsForList(list, setCount, existingValues) {
     if (!list) return;
     const existing = Array.isArray(existingValues) ? existingValues : [];
     list.innerHTML = '';
-    for (let i = 0; i < setCount; i += 1) {
+    const targetCount = Number.isFinite(setCount) ? Math.max(1, Number(setCount) || 1) : Math.max(1, existing.length || 1);
+    for (let i = 0; i < targetCount; i += 1) {
       const block = createSetBlock(i + 1, existing[i]);
       list.appendChild(block);
     }
@@ -358,11 +388,6 @@
       const existing = existingDataByRole && existingDataByRole[role] ? existingDataByRole[role] : [];
       renderQuickSetRowsForList(list, setCount, existing);
     });
-  }
-
-  function getQuickSetBlocksFromList(list) {
-    if (!list) return [];
-    return Array.from(list.querySelectorAll(':scope > .set-block'));
   }
 
   function collectQuickSetDataFromList(list) {
@@ -403,8 +428,8 @@
 
   function getQuickCardSetCount(card) {
     if (!card) return 1;
-    const select = card.querySelector('.quick-set-count');
-    return Number(select && select.value ? select.value : 1) || 1;
+    const primaryList = card.querySelector('[data-role="primary"] .quick-set-list');
+    return Math.max(1, getQuickSetBlocksFromList(primaryList).length);
   }
 
   function refreshQuickExerciseSelects() {
@@ -464,7 +489,7 @@
     const container = els.quickEntryList;
     if (!container) return;
     const exerciseCount = Array.from(container.querySelectorAll('.quick-exercise-select')).filter((s) => s.value).length;
-    const setCount = Array.from(container.querySelectorAll('.set-row')).length;
+    const setCount = Array.from(container.querySelectorAll('.quick-set-list .set-row')).length;
     const summary = document.getElementById('quickEntrySummary');
     if (summary) {
       if (exerciseCount === 0) {
@@ -485,15 +510,6 @@
     }
     if (target.matches('.quick-load-unit-select')) {
       target.dataset.unit = normalizeLoadUnit(target.value);
-    }
-    if (target.matches('.quick-set-count')) {
-      const n = Number(target.value) || 1;
-      const primaryList = card.querySelector('[data-role="primary"] .quick-set-list');
-      const secondaryList = card.querySelector('.quick-superset-section .quick-set-list');
-      renderQuickCardSetRows(card, n, {
-        primary: collectQuickSetDataFromList(primaryList),
-        secondary: collectQuickSetDataFromList(secondaryList)
-      });
     }
     debounceSaveQuickDraft();
   }
@@ -531,13 +547,40 @@
       return;
     }
 
+    const addSetButton = event.target.closest('.add-set-btn');
+    if (addSetButton) {
+      const section = addSetButton.closest('.quick-exercise-section');
+      if (section) {
+        addNormalSetToSection(section);
+        debounceSaveQuickDraft();
+      }
+      return;
+    }
+
+    const removeSetButton = event.target.closest('.remove-set-btn');
+    if (removeSetButton) {
+      const block = removeSetButton.closest('.set-block');
+      const list = block ? block.closest('.quick-set-list') : null;
+      if (block && list) {
+        block.remove();
+        renumberQuickSetBlocks(list);
+        updateQuickReadyCount();
+        debounceSaveQuickDraft();
+      }
+      return;
+    }
+
     const addButton = event.target.closest('.quick-add-superset-btn');
     if (addButton) {
       const card = addButton.closest('.quick-card');
       const supersetSection = card ? card.querySelector('.quick-superset-section') : null;
       if (card && supersetSection) {
         supersetSection.style.display = '';
-        renderQuickCardSetRows(card, getQuickCardSetCount(card));
+        const primaryList = card.querySelector('[data-role="primary"] .quick-set-list');
+        renderQuickCardSetRows(card, null, {
+          primary: collectQuickSetDataFromList(primaryList),
+          secondary: []
+        });
         refreshQuickExerciseSelects();
         refreshQuickComputedCellsForCard(card);
         updateQuickReadyCount();
@@ -555,7 +598,7 @@
         const secondarySelect = supersetSection.querySelector('.quick-exercise-select');
         if (secondarySelect) secondarySelect.value = '';
         const secondaryList = supersetSection.querySelector('.quick-set-list');
-        if (secondaryList) renderQuickSetRowsForList(secondaryList, getQuickCardSetCount(card), []);
+        if (secondaryList) renderQuickSetRowsForList(secondaryList, 1, []);
         refreshQuickComputedCellsForCard(card);
         updateQuickReadyCount();
         debounceSaveQuickDraft();
@@ -590,7 +633,7 @@
     const cards = Array.from(els.quickEntryList.querySelectorAll('.quick-card'))
       .map((card) => {
         const exercise = card.querySelector('[data-role="primary"] .quick-exercise-select').value.trim();
-        const setCount = Number(card.querySelector('.quick-set-count').value) || 1;
+        const sets = collectQuickSetDataFromList(card.querySelector('[data-role="primary"] .quick-set-list'));
         const tempo = card.querySelector('.quick-tempo-input').value.trim().toUpperCase();
         const variation = card.querySelector('.quick-variation-input').value.trim();
         const notes = card.querySelector('.quick-notes-input').value.trim();
@@ -599,7 +642,7 @@
         const supersetExercise = hasSuperset ? card.querySelector('.quick-superset-section .quick-exercise-select').value.trim() : '';
         const primaryList = card.querySelector('[data-role="primary"] .quick-set-list');
         const secondaryList = hasSuperset ? card.querySelector('.quick-superset-section .quick-set-list') : null;
-        const sets = collectQuickSetDataFromList(primaryList);
+        const setCount = sets.length || 1;
         const supersetSets = hasSuperset ? collectQuickSetDataFromList(secondaryList) : [];
 
         const hasContent = exercise || tempo || variation || notes || supersetExercise || sets.some((set) => set.load || set.reps || set.drops.some((drop) => drop.load || drop.reps)) || supersetSets.some((set) => set.load || set.reps || set.drops.some((drop) => drop.load || drop.reps));
@@ -676,12 +719,10 @@
     const controls = getQuickEntryControls();
     stored.cards.forEach((cardDraft) => {
       const card = createQuickExerciseCard();
-      const setCountSelect = card.querySelector('.quick-set-count');
       const tempoInput = card.querySelector('.quick-tempo-input');
       const variationInput = card.querySelector('.quick-variation-input');
       const notesInput = card.querySelector('.quick-notes-input');
 
-      setCountSelect.value = String(cardDraft.setCount || 1);
       tempoInput.value = cardDraft.tempo || '';
       variationInput.value = cardDraft.variation || '';
       notesInput.value = cardDraft.notes || '';
@@ -694,45 +735,9 @@
         supersetSection.style.display = shouldShowSuperset || shouldRestoreSupersetData ? '' : 'none';
       }
 
-      renderQuickCardSetRows(card, Number(cardDraft.setCount || 1), {
+      renderQuickCardSetRows(card, Number(cardDraft.setCount || (Array.isArray(cardDraft.sets) ? cardDraft.sets.length : 1) || 1), {
         primary: Array.isArray(cardDraft.sets) ? cardDraft.sets : [],
         secondary: Array.isArray(cardDraft.supersetSets) ? cardDraft.supersetSets : []
-      });
-
-      const primaryList = card.querySelector('[data-role="primary"] .quick-set-list');
-      const primarySetBlocks = getQuickSetBlocksFromList(primaryList);
-      primarySetBlocks.forEach((block, index) => {
-        const data = Array.isArray(cardDraft.sets) ? cardDraft.sets[index] : null;
-        const mainRow = block.querySelector(':scope > .set-row');
-        if (!mainRow || !data) return;
-        const loadInput = mainRow.querySelector('.quick-load-input');
-        const repsInput = mainRow.querySelector('.quick-reps-input');
-        if (loadInput) loadInput.value = data.load || '';
-        if (repsInput) repsInput.value = data.reps || '';
-        const dropList = block.querySelector(':scope > .drop-set-list');
-        if (!dropList) return;
-        dropList.innerHTML = '';
-        (Array.isArray(data.drops) ? data.drops : []).forEach((drop, dropIndex) => {
-          dropList.appendChild(createDropSetRow(dropIndex + 1, drop));
-        });
-      });
-
-      const secondaryList = supersetSection ? supersetSection.querySelector('.quick-set-list') : null;
-      const secondarySetBlocks = getQuickSetBlocksFromList(secondaryList);
-      secondarySetBlocks.forEach((block, index) => {
-        const data = Array.isArray(cardDraft.supersetSets) ? cardDraft.supersetSets[index] : null;
-        const mainRow = block.querySelector(':scope > .set-row');
-        if (!mainRow || !data) return;
-        const loadInput = mainRow.querySelector('.quick-load-input');
-        const repsInput = mainRow.querySelector('.quick-reps-input');
-        if (loadInput) loadInput.value = data.load || '';
-        if (repsInput) repsInput.value = data.reps || '';
-        const dropList = block.querySelector(':scope > .drop-set-list');
-        if (!dropList) return;
-        dropList.innerHTML = '';
-        (Array.isArray(data.drops) ? data.drops : []).forEach((drop, dropIndex) => {
-          dropList.appendChild(createDropSetRow(dropIndex + 1, drop));
-        });
       });
       if (secondarySelect && cardDraft.supersetExercise) {
         secondarySelect.value = cardDraft.supersetExercise;
