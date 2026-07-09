@@ -427,9 +427,12 @@
     const wrapper = document.createElement('div');
     wrapper.className = 'load-control quick-load-control';
     const input = document.createElement('input');
-    input.type = 'text';
+    input.type = 'number';
+    input.min = '0';
+    input.step = '0.1';
+    input.inputMode = 'decimal';
     input.className = 'quick-load-input';
-    input.placeholder = 'kg/BW';
+    input.placeholder = 'kg';
     const unitSelect = createLoadUnitSelect(defaultUnit);
     unitSelect.classList.add('quick-load-unit-select');
     wrapper.appendChild(input);
@@ -1835,7 +1838,7 @@
       </td>
       <td><input class="variation-input" type="text" placeholder="Optional" aria-label="Variation"></td>
       <td><input class="set-input compact-input" type="number" min="1" step="1" aria-label="Set"></td>
-      <td><div class="load-control"><input class="load-input compact-input" inputmode="decimal" placeholder="kg/BW" aria-label="Load kg"><select class="load-unit-select compact-select" aria-label="Load unit"><option value="kg">kg</option><option value="lb">lb</option></select></div></td>
+      <td><div class="load-control"><input class="load-input compact-input" type="number" min="0" step="0.1" inputmode="decimal" placeholder="kg" aria-label="Load kg"><select class="load-unit-select compact-select" aria-label="Load unit"><option value="kg">kg</option><option value="lb">lb</option></select></div></td>
       <td><input class="reps-input compact-input" inputmode="decimal" placeholder="reps" aria-label="Reps"></td>
       <td><input class="tempo-input compact-input" type="text" placeholder="31X0" aria-label="Tempo"></td>
       <td><input class="rpe-input compact-input" type="number" min="1" max="10" step="0.5" placeholder="RPE" aria-label="RPE"></td>

@@ -189,6 +189,7 @@ main {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .load-control .load-input,
@@ -199,8 +200,9 @@ main {
 
 .load-control .load-unit-select,
 .quick-load-control .quick-load-unit-select {
-  width: 70px;
-  flex: 0 0 70px;
+  width: 56px;
+  flex: 0 0 56px;
+  padding-inline: 8px;
 }
 
 label {
