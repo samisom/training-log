@@ -427,12 +427,11 @@
     const wrapper = document.createElement('div');
     wrapper.className = 'load-control quick-load-control';
     const input = document.createElement('input');
-    input.type = 'number';
-    input.min = '0';
-    input.step = '0.1';
+    // Use text + inputmode on mobile to avoid native number spinners
+    input.type = 'text';
     input.inputMode = 'decimal';
     input.className = 'quick-load-input';
-    input.placeholder = 'kg';
+    input.placeholder = 'load';
     const unitSelect = createLoadUnitSelect(defaultUnit);
     unitSelect.classList.add('quick-load-unit-select');
     wrapper.appendChild(input);
@@ -559,7 +558,9 @@
     const loadControl = createQuickLoadControl(values.unit || getWorkoutDefaultLoadUnit());
     const load = loadControl.input;
     const reps = document.createElement('input');
-    reps.type = 'number';
+    // use text + inputmode to prevent mobile spinner UI
+    reps.type = 'text';
+    reps.inputMode = 'numeric';
     reps.className = 'quick-reps-input';
     reps.placeholder = 'reps';
     const remove = document.createElement('button');
@@ -601,7 +602,9 @@
     const loadControl = createQuickLoadControl(values.unit || getWorkoutDefaultLoadUnit());
     const load = loadControl.input;
     const reps = document.createElement('input');
-    reps.type = 'number';
+    // use text + inputmode to prevent mobile spinner UI
+    reps.type = 'text';
+    reps.inputMode = 'numeric';
     reps.className = 'quick-reps-input';
     reps.placeholder = 'reps';
 

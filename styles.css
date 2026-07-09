@@ -607,32 +607,50 @@ th:first-child {
 
   .set-row {
     display: grid;
-    grid-template-columns: 34px 36px 28px minmax(0, 1fr) minmax(0, 1fr);
-    gap: 8px;
+    grid-template-columns: 44px 42px minmax(82px, 1fr) 58px 72px;
+    gap: 6px;
     align-items: center;
-  }
-
-  .set-row > * {
-    min-width: 0;
-  }
-
-  .quick-load-input,
-  .quick-reps-input,
-  .quick-load-unit-select,
-  .add-set-btn,
-  .drop-set-btn,
-  .remove-set-btn {
     width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
+  }
+
+  .set-row .set-label {
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .quick-load-input {
+    width: 100%;
+    min-width: 82px;
     font-size: 16px;
-    min-height: 44px;
+    box-sizing: border-box;
   }
 
   .quick-load-unit-select {
-    width: 64px;
-    flex: 0 0 64px;
-    padding-inline: 8px;
+    width: 58px;
+    min-width: 58px;
+    padding-left: 6px;
+    padding-right: 6px;
+    font-size: 16px;
+    box-sizing: border-box;
+  }
+
+  .quick-reps-input {
+    width: 72px;
+    min-width: 0;
+    font-size: 16px;
+    box-sizing: border-box;
+  }
+
+  .drop-set-btn {
+    width: 42px;
+    min-width: 42px;
+    padding: 0;
+  }
+
+  .set-row input,
+  .set-row select {
+    box-sizing: border-box;
+    min-height: 44px;
   }
 
   /* Make remove/clear buttons visually smaller so load input gains space */
