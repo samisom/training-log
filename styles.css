@@ -607,7 +607,7 @@ th:first-child {
 
   .set-row {
     display: grid;
-    grid-template-columns: 34px minmax(0, 1fr) 64px minmax(0, 1fr);
+    grid-template-columns: 34px 36px 28px minmax(0, 1fr) minmax(0, 1fr);
     gap: 8px;
     align-items: center;
   }
@@ -633,6 +633,24 @@ th:first-child {
     width: 64px;
     flex: 0 0 64px;
     padding-inline: 8px;
+  }
+
+  /* Make remove/clear buttons visually smaller so load input gains space */
+  .quick-card .readouts .remove-card,
+  .remove-drop-set-btn {
+    min-width: 20px;
+    min-height: 20px;
+    padding: 4px 6px;
+    font-size: 0.8rem;
+    border-radius: 8px;
+  }
+
+  .add-set-btn,
+  .remove-set-btn {
+    min-width: 18px;
+    min-height: 18px;
+    padding: 4px;
+    font-size: 0.85rem;
   }
 
   .quick-entry-footer #quickEntrySummary {
