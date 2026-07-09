@@ -20,6 +20,11 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/* Prevent accidental horizontal overflow on mobile */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
 body {
   margin: 0;
   background: var(--bg);
@@ -572,6 +577,67 @@ th:first-child {
   .mobile-save-bar button {
     font-size: 1rem;
     min-height: 48px;
+  }
+
+  /* Programmed workout button: full width and spacing on small screens */
+  .quick-entry-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .quick-entry-footer button {
+    width: 100%;
+    min-height: 44px;
+    box-sizing: border-box;
+    white-space: normal;
+  }
+
+  #loadProgrammedWorkoutBtn {
+    margin-top: 6px;
+    overflow: hidden;
+  }
+
+  /* Quick-cards and set rows should never overflow horizontally */
+  .quick-card {
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .set-row {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) 64px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+  }
+
+  .set-row > * {
+    min-width: 0;
+  }
+
+  .quick-load-input,
+  .quick-reps-input,
+  .quick-load-unit-select,
+  .add-set-btn,
+  .drop-set-btn,
+  .remove-set-btn {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    font-size: 16px;
+    min-height: 44px;
+  }
+
+  .quick-load-unit-select {
+    width: 64px;
+    flex: 0 0 64px;
+    padding-inline: 8px;
+  }
+
+  .quick-entry-footer #quickEntrySummary {
+    margin-left: 0;
+    text-align: left;
   }
 }
 
