@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pt-workout-logger-v1';
+const CACHE_NAME = 'pt-workout-logger-v3';
 const SHELL_FILES = [
   './',
   './index.html',
