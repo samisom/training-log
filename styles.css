@@ -675,6 +675,60 @@ th:first-child {
     margin-left: 0;
     text-align: left;
   }
+
+  /* Mobile set-row final overrides */
+  .set-row {
+    display: grid;
+    grid-template-columns: 46px 42px minmax(110px, 1fr) 54px 64px;
+    gap: 6px;
+    align-items: center;
+    width: 100%;
+  }
+
+  .set-row .set-label {
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .set-row .remove-set-btn {
+    display: none;
+  }
+
+  .quick-load-control {
+    display: contents;
+  }
+
+  .quick-load-input {
+    width: 100%;
+    min-width: 0;
+    font-size: 16px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .quick-load-unit-select {
+    width: 54px;
+    min-width: 54px;
+    max-width: 54px;
+    font-size: 16px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .quick-reps-input {
+    width: 64px;
+    min-width: 0;
+    max-width: 64px;
+    font-size: 16px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .set-row input,
+  .set-row select {
+    min-height: 44px;
+    box-sizing: border-box;
+  }
 }
 
 /* Mobile quick-entry cards */
