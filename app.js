@@ -508,18 +508,7 @@
           <label class="quick-exercise-label">Exercise
             <select class="quick-exercise-select"></select>
           </label>
-          <div class="readouts">
-            <div class="quick-readout-item">
-              <span>Last:</span>
-              <div class="quick-last-readout">-</div>
-            </div>
-            <div class="quick-readout-item">
-              <span>Target:</span>
-              <div class="quick-target-readout">-</div>
-            </div>
-            <div style="margin-left:auto"><button type="button" class="remove-card quick-remove-card-btn">Remove</button></div>
-          </div>
-          <div class="readout-helper">Last = most recent logged set. Target = PR load +5% and PR reps +1.</div>
+          <div style="margin-left:auto"><button type="button" class="remove-card quick-remove-card-btn">Remove</button></div>
           <div class="set-rows">
             <div class="quick-set-list"></div>
             <div class="quick-set-actions">
@@ -539,16 +528,6 @@
             <label class="quick-exercise-label">Exercise
               <select class="quick-exercise-select"></select>
             </label>
-            <div class="readouts">
-              <div class="quick-readout-item">
-                <span>Last:</span>
-                <div class="quick-last-readout">-</div>
-              </div>
-              <div class="quick-readout-item">
-                <span>Target:</span>
-                <div class="quick-target-readout">-</div>
-              </div>
-            </div>
             <div class="set-rows">
               <div class="quick-set-list"></div>
               <div class="quick-set-actions">
@@ -768,19 +747,6 @@
 
   function refreshQuickComputedCellsForCard(card) {
     if (!card) return;
-    const variation = card.querySelector('.quick-variation-input') ? card.querySelector('.quick-variation-input').value.trim() : '';
-    const sections = Array.from(card.querySelectorAll('.quick-exercise-section'));
-    sections.forEach((section) => {
-      const exerciseSelect = section.querySelector('.quick-exercise-select');
-      const exercise = exerciseSelect ? exerciseSelect.value : '';
-      const last = findLastUsed(exercise, variation);
-      const target = getTarget(exercise);
-      const lastEl = section.querySelector('.quick-last-readout');
-      const targetEl = section.querySelector('.quick-target-readout');
-      if (lastEl) lastEl.textContent = last || '-';
-      if (targetEl) targetEl.textContent = target || '-';
-    });
-
     const tempoInput = card.querySelector('.quick-tempo-input');
     const primaryExercise = card.querySelector('[data-role="primary"] .quick-exercise-select');
     const primaryValue = primaryExercise ? primaryExercise.value : '';
@@ -1862,8 +1828,6 @@
       <td><input class="tempo-input compact-input" type="text" placeholder="31X0" aria-label="Tempo"></td>
       <td><input class="rpe-input compact-input" type="number" min="1" max="10" step="0.5" placeholder="RPE" aria-label="RPE"></td>
       <td><input class="rest-input compact-input" type="number" min="0" step="5" placeholder="sec" aria-label="Rest seconds"></td>
-      <td class="readout last-readout">-</td>
-      <td class="readout target-readout">-</td>
       <td>
         <select class="pr-select" aria-label="PR flag">
           <option value=""></option>
@@ -1912,12 +1876,6 @@
 
   function refreshComputedCellsForRow(tr) {
     if (!tr) return;
-    const exercise = tr.querySelector('.exercise-select').value;
-    const variation = tr.querySelector('.variation-input').value.trim();
-    const last = findLastUsed(exercise, variation);
-    const target = getTarget(exercise);
-    tr.querySelector('.last-readout').textContent = last || '-';
-    tr.querySelector('.target-readout').textContent = target || '-';
     updateRowMetaLine(tr);
   }
 

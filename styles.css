@@ -401,9 +401,18 @@ th:first-child {
 .set-input,
 .rpe-input,
 .rest-input,
-.load-input,
 .reps-input {
   min-width: 80px;
+}
+
+.load-input {
+  min-width: 160px;
+  width: 160px;
+}
+
+.reps-input {
+  min-width: 160px;
+  width: 160px;
 }
 
 .tempo-input {
@@ -424,10 +433,6 @@ th:first-child {
   color: #344054;
   font-weight: 800;
   line-height: 1.3;
-}
-
-.target-readout {
-  color: var(--accent-dark);
 }
 
 .meta-line {
@@ -821,52 +826,6 @@ th:first-child {
 }
 
 /* Readouts row (last and target) */
-.quick-card .readouts {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  flex-wrap: wrap;
-  padding: 8px 0;
-}
-
-.quick-readout-item {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 0.85rem;
-  line-height: 1.3;
-}
-
-.quick-readout-item > span {
-  color: var(--muted);
-  font-weight: 700;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-
-.quick-readout-item > div {
-  font-weight: 800;
-  color: #344054;
-  font-size: 0.95rem;
-}
-
-.quick-last-readout {
-  color: var(--muted);
-}
-
-.quick-target-readout {
-  color: var(--accent);
-}
-
-.readout-helper {
-  font-size: 0.78rem;
-  color: var(--muted);
-  font-weight: 600;
-  line-height: 1.35;
-  margin-top: 2px;
-}
-
 /* Sets control (number of sets selector) */
 .sets-control {
   display: flex;
