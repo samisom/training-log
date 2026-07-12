@@ -203,14 +203,7 @@ main {
   min-width: 0;
 }
 
-.load-control .load-unit-select,
-.quick-load-control .quick-load-unit-select {
-  width: 56px;
-  flex: 0 0 56px;
-  padding-inline: 8px;
-}
-
-label {
+  .load-control .load-unit-select {
   display: grid;
   gap: 6px;
   color: #344054;
@@ -625,15 +618,6 @@ th:first-child {
     box-sizing: border-box;
   }
 
-  .quick-load-unit-select {
-    width: 58px;
-    min-width: 58px;
-    padding-left: 6px;
-    padding-right: 6px;
-    font-size: 16px;
-    box-sizing: border-box;
-  }
-
   .quick-reps-input {
     width: 72px;
     min-width: 0;
@@ -679,7 +663,7 @@ th:first-child {
   /* Mobile set-row final overrides */
   .set-row {
     display: grid;
-    grid-template-columns: 46px 42px minmax(110px, 1fr) 54px 64px;
+    grid-template-columns: 48px 42px minmax(0, 1fr) 72px;
     gap: 6px;
     align-items: center;
     width: 100%;
@@ -706,19 +690,15 @@ th:first-child {
     padding-right: 10px;
   }
 
-  .quick-load-unit-select {
-    width: 54px;
-    min-width: 54px;
-    max-width: 54px;
-    font-size: 16px;
-    padding-left: 4px;
-    padding-right: 4px;
+  .quick-load-input::placeholder {
+    color: #98a2b3;
+    opacity: 1;
   }
 
   .quick-reps-input {
-    width: 64px;
+    width: 72px;
     min-width: 0;
-    max-width: 64px;
+    max-width: 72px;
     font-size: 16px;
     padding-left: 8px;
     padding-right: 8px;

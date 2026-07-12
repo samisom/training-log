@@ -38,6 +38,7 @@
     attachEvents();
     quickDraftContext = getQuickDraftContext();
     ensureQuickUI();
+    updateLoadPlaceholders();
     loadSeedExercises();
     waitForGoogleIdentity();
     registerServiceWorker();
@@ -284,6 +285,15 @@
     const groups = groupProgrammedWorkoutRows(rows);
     if (!groups.length) return false;
 
+    const units = Array.from(new Set(rows.map((row) => normalizeLoadUnit(row.unit || 'kg'))));
+    if (units.length === 1) {
+      setWorkoutDefaultLoadUnit(units[0]);
+    } else {
+      setWorkoutDefaultLoadUnit('kg');
+      setSetupMessage('Programmed workout has mixed units. Using kg as workout unit.', 'warning');
+    }
+    updateLoadPlaceholders();
+
     const controls = getQuickEntryControls();
     groups.forEach((group) => {
       const card = createQuickExerciseCard();
@@ -398,12 +408,26 @@
     return normalizeLoadUnit(state.defaultLoadUnit || 'kg');
   }
 
+  function getWorkoutLoadUnit() {
+    return normalizeLoadUnit((els.loadUnitSelect && els.loadUnitSelect.value) || state.defaultLoadUnit || 'kg');
+  }
+
+  function updateLoadPlaceholders() {
+    const unit = getWorkoutLoadUnit();
+    const placeholder = unit;
+    const inputs = document.querySelectorAll('.quick-load-input');
+    inputs.forEach((input) => {
+      input.placeholder = placeholder;
+    });
+  }
+
   function setWorkoutDefaultLoadUnit(unit) {
     const normalized = normalizeLoadUnit(unit);
     state.defaultLoadUnit = normalized;
     if (els.loadUnitSelect) {
       els.loadUnitSelect.value = normalized;
     }
+    updateLoadPlaceholders();
     return normalized;
   }
 
@@ -423,7 +447,7 @@
     return select;
   }
 
-  function createQuickLoadControl(defaultUnit) {
+  function createQuickLoadControl() {
     const wrapper = document.createElement('div');
     wrapper.className = 'load-control quick-load-control';
     const input = document.createElement('input');
@@ -431,12 +455,9 @@
     input.type = 'text';
     input.inputMode = 'decimal';
     input.className = 'quick-load-input';
-    input.placeholder = 'load';
-    const unitSelect = createLoadUnitSelect(defaultUnit);
-    unitSelect.classList.add('quick-load-unit-select');
+    input.placeholder = getWorkoutLoadUnit();
     wrapper.appendChild(input);
-    wrapper.appendChild(unitSelect);
-    return { wrapper, input, unitSelect };
+    return { wrapper, input };
   }
 
   function getRowLoadUnit(select, fallback) {
@@ -555,7 +576,7 @@
     label.className = 'drop-set-label';
     label.textContent = `Drop ${dropIndex}`;
     const values = existingValues || {};
-    const loadControl = createQuickLoadControl(values.unit || getWorkoutDefaultLoadUnit());
+    const loadControl = createQuickLoadControl();
     const load = loadControl.input;
     const reps = document.createElement('input');
     // use text + inputmode to prevent mobile spinner UI
@@ -599,7 +620,7 @@
     remove.setAttribute('aria-label', `Remove Set ${setNumber}`);
     remove.hidden = setNumber <= 1;
     const values = existingValues || {};
-    const loadControl = createQuickLoadControl(values.unit || getWorkoutDefaultLoadUnit());
+    const loadControl = createQuickLoadControl();
     const load = loadControl.input;
     const reps = document.createElement('input');
     // use text + inputmode to prevent mobile spinner UI
@@ -682,15 +703,12 @@
     return getQuickSetBlocksFromList(list).map((block) => {
       const mainRow = block.querySelector(':scope > .set-row');
       const dropRows = Array.from(block.querySelectorAll(':scope > .drop-set-list > .drop-set-row'));
-      const mainUnitSelect = mainRow ? mainRow.querySelector('.quick-load-unit-select') : null;
       return {
         load: mainRow ? mainRow.querySelector('.quick-load-input').value : '',
         reps: mainRow ? mainRow.querySelector('.quick-reps-input').value : '',
-        unit: getRowLoadUnit(mainUnitSelect),
         drops: dropRows.map((row) => ({
           load: row.querySelector('.quick-load-input').value || '',
-          reps: row.querySelector('.quick-reps-input').value || '',
-          unit: getRowLoadUnit(row.querySelector('.quick-load-unit-select'))
+          reps: row.querySelector('.quick-reps-input').value || ''
         }))
       };
     });
@@ -794,9 +812,6 @@
     if (target.matches('.quick-exercise-select')) {
       refreshQuickComputedCellsForCard(card);
       updateQuickReadyCount();
-    }
-    if (target.matches('.quick-load-unit-select')) {
-      target.dataset.unit = normalizeLoadUnit(target.value);
     }
     debounceSaveQuickDraft();
   }
@@ -1230,6 +1245,7 @@
     if (els.loadUnitSelect) {
       els.loadUnitSelect.addEventListener('change', (event) => {
         setWorkoutDefaultLoadUnit(event.target.value);
+        updateLoadPlaceholders();
         debounceSaveQuickDraft();
       });
     }
@@ -1659,7 +1675,7 @@
 
         const primarySection = card.querySelector('[data-role="primary"]');
         const primaryExercise = primarySection ? primarySection.querySelector('.quick-exercise-select').value.trim() : '';
-        const primarySetRows = primarySection ? collectQuickSetDataFromList(primarySection.querySelector('.quick-set-list')) : [];
+            const primarySetRows = primarySection ? collectQuickSetDataFromList(primarySection.querySelector('.quick-set-list')) : [];
         const secondarySection = card.querySelector('.quick-superset-section');
         const secondaryExercise = secondarySection && secondarySection.style.display !== 'none' ? secondarySection.querySelector('.quick-exercise-select').value.trim() : '';
         const secondarySetRows = secondarySection && secondarySection.style.display !== 'none' ? collectQuickSetDataFromList(secondarySection.querySelector('.quick-set-list')) : [];
@@ -1684,7 +1700,7 @@
             const setData = section.sets[setIndex];
             if (!setData) return;
             const loadRaw = String(setData.load || '').trim();
-            const loadUnit = getRowLoadUnit(null, setData.unit);
+            const loadUnit = getWorkoutLoadUnit();
             const repsRaw = String(setData.reps || '').trim();
             if (!loadRaw && !repsRaw) return;
             if (!loadRaw) errors.push(`Quick entry ${cardIndex + 1}, set ${setIndex + 1}: enter load.`);
@@ -1724,7 +1740,7 @@
                 errors.push(`Quick entry ${cardIndex + 1}, set ${setIndex + 1} drop ${dropIndex + 1}: enter both load and reps.`);
                 return;
               }
-              const dropLoadUnit = getRowLoadUnit(null, drop.unit);
+              const dropLoadUnit = getWorkoutLoadUnit();
               const dropLoad = convertLoadToKg(dropLoadRaw, dropLoadUnit);
               const dropReps = coerceCellValue(dropRepsRaw);
               const dropNumericLoad = typeof dropLoad === 'number' ? dropLoad : null;
