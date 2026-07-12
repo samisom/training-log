@@ -511,9 +511,6 @@
           <div style="margin-left:auto"><button type="button" class="remove-card quick-remove-card-btn">Remove</button></div>
           <div class="set-rows">
             <div class="quick-set-list"></div>
-            <div class="quick-set-actions">
-              <button type="button" class="add-set-btn" aria-label="Add set">+</button>
-            </div>
           </div>
         </div>
         <div class="quick-superset-actions">
@@ -530,9 +527,6 @@
             </label>
             <div class="set-rows">
               <div class="quick-set-list"></div>
-              <div class="quick-set-actions">
-                <button type="button" class="add-set-btn" aria-label="Add set">+</button>
-              </div>
             </div>
           </div>
         </div>
@@ -592,12 +586,6 @@
     addDrop.className = 'drop-set-btn';
     addDrop.textContent = '+↓';
     addDrop.setAttribute('aria-label', `Add drop set under set ${setNumber}`);
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'remove-set-btn';
-    remove.textContent = '×';
-    remove.setAttribute('aria-label', `Remove Set ${setNumber}`);
-    remove.hidden = setNumber <= 1;
     const values = existingValues || {};
     const loadControl = createQuickLoadControl();
     const load = loadControl.input;
@@ -613,9 +601,24 @@
 
     row.appendChild(label);
     row.appendChild(addDrop);
-    row.appendChild(remove);
     row.appendChild(loadControl.wrapper);
     row.appendChild(reps);
+
+    const actionsRow = document.createElement('div');
+    actionsRow.className = 'set-actions-row';
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'remove-set-btn';
+    remove.textContent = '−';
+    remove.setAttribute('aria-label', `Remove Set ${setNumber}`);
+    remove.hidden = setNumber <= 1;
+    const addSet = document.createElement('button');
+    addSet.type = 'button';
+    addSet.className = 'add-set-btn';
+    addSet.textContent = '+';
+    addSet.setAttribute('aria-label', 'Add set');
+    actionsRow.appendChild(remove);
+    actionsRow.appendChild(addSet);
 
     const drops = document.createElement('div');
     drops.className = 'drop-set-list';
@@ -624,6 +627,7 @@
     });
 
     block.appendChild(row);
+    block.appendChild(actionsRow);
     block.appendChild(drops);
     return block;
   }

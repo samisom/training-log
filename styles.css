@@ -668,8 +668,8 @@ th:first-child {
   /* Mobile set-row final overrides */
   .set-row {
     display: grid;
-    grid-template-columns: 48px 42px minmax(0, 1fr) 72px;
-    gap: 6px;
+    grid-template-columns: 48px 42px minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
     align-items: center;
     width: 100%;
   }
@@ -679,18 +679,62 @@ th:first-child {
     white-space: nowrap;
   }
 
-  .set-row .remove-set-btn {
-    display: none;
+  .set-actions-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .remove-set-btn,
+  .add-set-btn {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+    border-radius: 999px;
+    font-size: 1.4rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+  }
+
+  .remove-set-btn {
+    background: #ef4444;
+    color: #fff;
+  }
+
+  .add-set-btn {
+    background: #22c55e;
+    color: #fff;
+  }
+
+  .drop-set-btn {
+    width: 42px;
+    min-width: 42px;
+    padding: 0;
+    border: none;
+    border-radius: 12px;
+    background: #f3f4f6;
+    color: var(--ink);
+    cursor: pointer;
   }
 
   .quick-load-control {
     display: contents;
   }
 
-  .quick-load-input {
+  .quick-load-input,
+  .quick-reps-input {
     width: 100%;
     min-width: 0;
     font-size: 16px;
+    min-height: 44px;
+    box-sizing: border-box;
     padding-left: 10px;
     padding-right: 10px;
   }
@@ -698,15 +742,6 @@ th:first-child {
   .quick-load-input::placeholder {
     color: #98a2b3;
     opacity: 1;
-  }
-
-  .quick-reps-input {
-    width: 72px;
-    min-width: 0;
-    max-width: 72px;
-    font-size: 16px;
-    padding-left: 8px;
-    padding-right: 8px;
   }
 
   .set-row input,
@@ -862,35 +897,32 @@ th:first-child {
 }
 
 .quick-set-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 2px;
-}
+    display: none;
+  }
 
-.add-set-btn,
-.remove-set-btn {
-  border: none;
-  border-radius: 999px;
-  min-height: 36px;
-  min-width: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  cursor: pointer;
-}
+  .add-set-btn,
+  .remove-set-btn {
+    border: none;
+    border-radius: 999px;
+    min-height: 44px;
+    min-width: 44px;
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    cursor: pointer;
+  }
 
-.add-set-btn {
-  background: #22c55e;
-  color: white;
-  box-shadow: 0 4px 10px rgba(34, 197, 94, 0.25);
-}
+  .add-set-btn {
+    background: #22c55e;
+    color: white;
+  }
 
-.remove-set-btn {
-  background: #fff1f2;
-  color: var(--danger);
-  border: 1px solid rgba(220, 38, 38, 0.16);
-}
+  .remove-set-btn {
+    background: #ef4444;
+    color: white;
 
 /* Individual set block and nested drop-set rows */
 .set-block {
