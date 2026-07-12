@@ -508,7 +508,6 @@
           <label class="quick-exercise-label">Exercise
             <select class="quick-exercise-select"></select>
           </label>
-          <div style="margin-left:auto"><button type="button" class="remove-card quick-remove-card-btn">Remove</button></div>
           <div class="set-rows">
             <div class="quick-set-list"></div>
           </div>
