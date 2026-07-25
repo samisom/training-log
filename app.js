@@ -16,6 +16,8 @@
     prRows: [],
     logRows: [],
     programmedRows: [],
+    activeProgrammedSession: '',
+    activeProgrammedDate: '',
     selectedExercise: null,
     isSaving: false,
     isLoading: false,
@@ -38,6 +40,7 @@
     attachEvents();
     quickDraftContext = getQuickDraftContext();
     ensureQuickUI();
+    updateProgramStatus();
     updateLoadPlaceholders();
     loadSeedExercises();
     waitForGoogleIdentity();
@@ -55,6 +58,8 @@
       'loadSheetBtn',
       'forgetSheetBtn',
       'setupMessage',
+      'programStatus',
+      'loadProgrammedTopBtn',
       'dateInput',
       'bodyweightInput',
       'loadUnitSelect',
@@ -139,6 +144,57 @@
     });
   }
 
+  function isQuickEntryLayout() {
+    return Boolean(window.matchMedia && window.matchMedia('(max-width: 820px)').matches);
+  }
+
+  function hasDesktopEntryContent() {
+    if (!els.entryBody) return false;
+    return Array.from(els.entryBody.querySelectorAll('tr')).some((tr) => {
+      const exercise = tr.querySelector('.exercise-select')?.value.trim() || '';
+      const variation = tr.querySelector('.variation-input')?.value.trim() || '';
+      const setNumber = tr.querySelector('.set-input')?.value.trim() || '';
+      const load = tr.querySelector('.load-input')?.value.trim() || '';
+      const reps = tr.querySelector('.reps-input')?.value.trim() || '';
+      const notes = tr.querySelector('.notes-input')?.value.trim() || '';
+      return exercise || variation || setNumber || load || reps || notes;
+    });
+  }
+
+  function hasActiveEntryContent() {
+    return isQuickEntryLayout() ? hasQuickEntryContent() : hasDesktopEntryContent();
+  }
+
+  function getProgrammedSessionLabel(rows) {
+    const labels = Array.from(new Set((rows || []).map((row) => safeString(row.workout)).filter(Boolean)));
+    return labels[0] || '';
+  }
+
+  function setProgramContext(rows, date) {
+    state.activeProgrammedSession = getProgrammedSessionLabel(rows);
+    state.activeProgrammedDate = normalizeProgrammedDateValue(date);
+    updateProgramStatus();
+  }
+
+  function clearProgramContext() {
+    state.activeProgrammedSession = '';
+    state.activeProgrammedDate = '';
+    updateProgramStatus();
+  }
+
+  function updateProgramStatus() {
+    if (!els.programStatus) return;
+    const session = safeString(state.activeProgrammedSession);
+    const date = safeString(state.activeProgrammedDate);
+    els.programStatus.className = 'program-status';
+    if (session || date) {
+      els.programStatus.textContent = `Program loaded: ${session || 'Workout'}${date ? ` • ${date}` : ''}`;
+      els.programStatus.classList.add('loaded');
+    } else {
+      els.programStatus.textContent = 'No programmed workout loaded for this date.';
+    }
+  }
+
   function normalizeProgrammedDateValue(value) {
     if (value === null || value === undefined || value === '') return '';
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -158,20 +214,17 @@
     const rows = Array.isArray(valueRows) ? valueRows : [];
     return rows.map((row) => ({
       date: normalizeProgrammedDateValue(row[0]),
-      order: safeString(row[1]),
-      exercise: safeString(row[2]),
-      variation: safeString(row[3]),
-      set: safeString(row[4]),
-      load: safeString(row[5]),
-      unit: safeString(row[6]),
-      reps: safeString(row[7]),
-      tempo: safeString(row[8]),
-      cues: safeString(row[9]),
-      notes: safeString(row[10]),
-      superset: safeString(row[11]),
-      muscleGroups: safeString(row[12]),
-      coachNotes: safeString(row[13])
-    })).filter((row) => row.date || row.exercise || row.set || row.load || row.reps || row.notes || row.cues || row.coachNotes || row.superset || row.muscleGroups);
+      workout: safeString(row[1]),
+      order: safeString(row[2]),
+      exercise: safeString(row[3]),
+      variation: safeString(row[4]),
+      set: safeString(row[5]),
+      load: safeString(row[6]),
+      unit: safeString(row[7]),
+      reps: safeString(row[8]),
+      tempo: safeString(row[9]),
+      notes: safeString(row[10])
+    })).filter((row) => row.date || row.workout || row.exercise || row.set || row.load || row.reps || row.notes);
   }
 
   function getProgrammedRowsForDate(date) {
@@ -208,24 +261,13 @@
   }
 
   function buildProgrammedNotes(rows) {
-    const parts = [];
-    rows.forEach((row) => {
-      const cues = safeString(row.cues);
-      const notes = safeString(row.notes);
-      const coachNotes = safeString(row.coachNotes);
-      const superset = safeString(row.superset);
-      if (cues) parts.push(`Cues: ${cues}`);
-      if (notes) parts.push(`Notes: ${notes}`);
-      if (coachNotes) parts.push(`Coach: ${coachNotes}`);
-      if (superset) parts.push(`Superset: ${superset}`);
-    });
-    return parts.filter(Boolean).join('\n');
+    return Array.from(new Set((rows || []).map((row) => safeString(row.notes)).filter(Boolean))).join('\n');
   }
 
   function groupProgrammedWorkoutRows(rows) {
     const groups = new Map();
     sortProgrammedRows(rows).forEach((row) => {
-      const key = [safeString(row.order), safeString(row.exercise), safeString(row.variation), safeString(row.superset)].join('::');
+      const key = [safeString(row.order), safeString(row.exercise), safeString(row.variation)].join('::');
       if (!groups.has(key)) {
         groups.set(key, {
           exercise: safeString(row.exercise),
@@ -334,37 +376,98 @@
     return true;
   }
 
+  function createDesktopRowsFromProgrammedRows(rows) {
+    const sortedRows = sortProgrammedRows(rows);
+    if (!sortedRows.length || !els.entryBody) return false;
+
+    clearRows();
+    const fragment = document.createDocumentFragment();
+    sortedRows.forEach(() => fragment.appendChild(createEntryRow()));
+    els.entryBody.appendChild(fragment);
+    refreshExerciseSelects();
+
+    const tableRows = Array.from(els.entryBody.querySelectorAll('tr'));
+    sortedRows.forEach((row, index) => {
+      const tr = tableRows[index];
+      if (!tr) return;
+      const exerciseSelect = tr.querySelector('.exercise-select');
+      if (exerciseSelect && row.exercise) {
+        if (!Array.from(exerciseSelect.options).some((option) => option.value === row.exercise)) {
+          const option = document.createElement('option');
+          option.value = row.exercise;
+          option.textContent = `${row.exercise} - programmed`;
+          exerciseSelect.appendChild(option);
+        }
+        exerciseSelect.value = row.exercise;
+      }
+      tr.querySelector('.variation-input').value = row.variation || '';
+      tr.querySelector('.set-input').value = row.set || '';
+      tr.querySelector('.load-input').value = row.load || '';
+      tr.querySelector('.reps-input').value = row.reps || '';
+      tr.querySelector('.tempo-input').value = String(row.tempo || '').toUpperCase();
+      tr.querySelector('.notes-input').value = row.notes || '';
+      const unitSelect = tr.querySelector('.load-unit-select');
+      if (unitSelect) unitSelect.value = normalizeLoadUnit(row.unit || getWorkoutDefaultLoadUnit());
+    });
+
+    refreshAllComputedCells();
+    updateReadyCount();
+    return true;
+  }
+
+  function resetEntryForCurrentLayout() {
+    clearQuickCards();
+    clearRows();
+    if (!isQuickEntryLayout()) addRows(Number(CONFIG.DEFAULT_ROWS || 8));
+  }
+
   function applyProgrammedWorkoutForCurrentDate(options = {}) {
+    const selectedDate = els.dateInput.value;
+    const rows = getProgrammedRowsForDate(selectedDate);
+    const useQuickEntry = isQuickEntryLayout();
     const context = getQuickDraftContext();
-    if (hasQuickDraftForContext(context)) {
+
+    if (useQuickEntry && !options.force && hasQuickDraftForContext(context)) {
       restoreQuickDraft(context);
       setSetupMessage('Draft restored instead of programmed workout.', 'success');
       return false;
     }
 
-    if (!options.force && hasQuickEntryContent()) {
-      clearQuickCards();
-    }
-
-    const selectedDate = els.dateInput.value;
-    const rows = getProgrammedRowsForDate(selectedDate);
     if (!rows.length) {
-      clearQuickCards();
+      clearProgramContext();
+      if (options.force) resetEntryForCurrentLayout();
       setSetupMessage('No programmed workout found for this date.', 'success');
       return false;
     }
 
-    const loaded = createQuickCardsFromProgrammedRows(rows);
+    if (!options.force && hasActiveEntryContent()) {
+      const label = getProgrammedSessionLabel(rows) || 'programmed workout';
+      setSetupMessage(`${label} is available for this date. Use Load programmed workout to replace the current entries.`, 'success');
+      return false;
+    }
+
+    setProgramContext(rows, selectedDate);
+    let loaded = false;
+    if (useQuickEntry) {
+      clearRows();
+      loaded = createQuickCardsFromProgrammedRows(rows);
+    } else {
+      clearQuickCards();
+      loaded = createDesktopRowsFromProgrammedRows(rows);
+    }
+
     if (loaded) {
-      setSetupMessage('Programmed workout loaded.', 'success');
+      const session = state.activeProgrammedSession || 'Programmed workout';
+      setSetupMessage(`${session} loaded. Replace targets with actual results, then save.`, 'success');
       return true;
     }
+    clearProgramContext();
     return false;
   }
 
   function loadProgrammedWorkoutForCurrentDate(options = {}) {
-    if (options.force && hasQuickEntryContent()) {
-      const confirmed = window.confirm('Replace the current workout cards with the programmed workout for this date?');
+    if (options.force && hasActiveEntryContent()) {
+      const confirmed = window.confirm('Replace the current workout entries with the programmed workout for this date?');
       if (!confirmed) {
         setSetupMessage('Programmed workout load cancelled.', '');
         return false;
@@ -376,6 +479,7 @@
   async function loadProgrammedWorkoutsFromSheet() {
     if (!state.sheetId || !state.accessToken) {
       state.programmedRows = [];
+      clearProgramContext();
       return false;
     }
 
@@ -394,6 +498,7 @@
     } catch (error) {
       console.warn('Programmed workout tab could not be loaded', error);
       state.programmedRows = [];
+      clearProgramContext();
       setSetupMessage('Programmed workout tab not found. Workout logging still works.', 'success');
       return false;
     }
@@ -936,7 +1041,9 @@
     return {
       cards,
       activeMuscleGroups: Array.from(state.activeMuscleGroups),
-      defaultLoadUnit: getWorkoutDefaultLoadUnit()
+      defaultLoadUnit: getWorkoutDefaultLoadUnit(),
+      programSession: state.activeProgrammedSession || '',
+      programDate: state.activeProgrammedDate || ''
     };
   }
 
@@ -980,6 +1087,14 @@
 
     if (stored.defaultLoadUnit) {
       setWorkoutDefaultLoadUnit(stored.defaultLoadUnit);
+    }
+
+    if (stored.programSession || stored.programDate) {
+      state.activeProgrammedSession = safeString(stored.programSession);
+      state.activeProgrammedDate = normalizeProgrammedDateValue(stored.programDate || draftContext.date);
+      updateProgramStatus();
+    } else {
+      clearProgramContext();
     }
 
     const container = els.quickEntryList;
@@ -1071,17 +1186,18 @@
       return;
     }
 
-    saveQuickDraft(previous);
+    if (isQuickEntryLayout()) saveQuickDraft(previous);
     quickDraftContext = next;
-    if (hasQuickDraftForContext(next)) {
+    if (isQuickEntryLayout() && hasQuickDraftForContext(next)) {
       restoreQuickDraft(next);
       setSetupMessage('Draft restored instead of programmed workout.', 'success');
     } else {
-      applyProgrammedWorkoutForCurrentDate({ force: false });
+      applyProgrammedWorkoutForCurrentDate({ force: true, fromDateChange: true });
     }
   }
 
   function debounceSaveQuickDraft() {
+    if (!isQuickEntryLayout()) return;
     if (draftSaveTimer) {
       clearTimeout(draftSaveTimer);
     }
@@ -1198,6 +1314,9 @@
     els.loadSheetBtn.addEventListener('click', () => loadSheetData());
     els.forgetSheetBtn.addEventListener('click', forgetSheet);
     els.dateInput.addEventListener('change', handleDraftContextChange);
+    if (els.loadProgrammedTopBtn) {
+      els.loadProgrammedTopBtn.addEventListener('click', () => loadProgrammedWorkoutForCurrentDate({ force: true }));
+    }
     if (els.muscleGroupOptions) {
       els.muscleGroupOptions.addEventListener('change', handleMuscleGroupChange);
     }
@@ -1244,7 +1363,7 @@
       refreshExerciseSelects();
       refreshQuickExerciseSelects();
       setConnectionStatus('Demo mode', '');
-      restoreQuickDraft();
+      if (isQuickEntryLayout()) restoreQuickDraft();
     } catch (error) {
       console.warn(error);
       setSetupMessage('Seed exercises could not be loaded. Connect a Google Sheet to continue.', 'error');
@@ -1309,6 +1428,8 @@
     els.sheetIdInput.value = '';
     state.logRows = [];
     state.prRows = [];
+    state.programmedRows = [];
+    clearProgramContext();
     setSetupMessage('Forgot the saved Sheet ID on this browser.', 'success');
     setConnectionStatus(state.accessToken ? 'Google connected' : 'Demo mode', state.accessToken ? 'connected' : '');
     refreshAllComputedCells();
@@ -1363,7 +1484,6 @@
       const source = parsedExercises.length ? 'sheet' : 'seed fallback';
       setSetupMessage(`Loaded ${state.exercises.length} exercises from ${source}, ${state.prRows.length} PR rows, and ${state.logRows.length} log rows.`, 'success');
       await loadProgrammedWorkoutsFromSheet();
-      restoreQuickDraft();
     } catch (error) {
       handleApiError(error, 'Could not load the Google Sheet.');
     } finally {
@@ -1403,6 +1523,7 @@
       clearRows();
       clearQuickDraft();
       clearQuickCards();
+      clearProgramContext();
       addRows(Number(CONFIG.DEFAULT_ROWS || 8));
       if (!formattingSucceeded) {
         setSetupMessage(`Saved ${collected.rows.length} rows.${prUpdateCount ? ` Updated ${prUpdateCount} PR row(s).` : ''} Draft cleared after save. Superset highlighting failed.`, 'warning');
@@ -1538,19 +1659,18 @@
     const errors = [];
     const activeExerciseNames = [];
     const formatBlocks = [];
+    const useQuickEntry = isQuickEntryLayout();
 
     if (!date) errors.push('Choose a date first.');
 
-    // First pass: collect all active exercise names from desktop rows
-    Array.from(els.entryBody.querySelectorAll('tr')).forEach((tr) => {
-      const exercise = tr.querySelector('.exercise-select').value.trim();
-      if (exercise) {
-        activeExerciseNames.push(exercise);
-      }
-    });
+    if (!useQuickEntry) {
+      Array.from(els.entryBody.querySelectorAll('tr')).forEach((tr) => {
+        const exercise = tr.querySelector('.exercise-select').value.trim();
+        if (exercise) activeExerciseNames.push(exercise);
+      });
+    }
 
-    // Collect all active exercise names from quick cards
-    if (els.quickEntryList) {
+    if (useQuickEntry && els.quickEntryList) {
       Array.from(els.quickEntryList.querySelectorAll('.quick-card')).forEach((card) => {
         const primaryExercise = card.querySelector('[data-role="primary"] .quick-exercise-select').value.trim();
         const secondaryExercise = card.querySelector('.quick-superset-section .quick-exercise-select').value.trim();
@@ -1571,70 +1691,72 @@
       });
     }
 
-    // Calculate workout focus label once
-    const workoutSessionLabel = getWorkoutFocusLabel(activeExerciseNames);
+    const programMatchesDate = normalizeProgrammedDateValue(state.activeProgrammedDate) === normalizeProgrammedDateValue(date);
+    const workoutSessionLabel = programMatchesDate && state.activeProgrammedSession
+      ? state.activeProgrammedSession
+      : getWorkoutFocusLabel(activeExerciseNames);
 
-    // Second pass: process desktop rows
-    Array.from(els.entryBody.querySelectorAll('tr')).forEach((tr, index) => {
-      const exercise = tr.querySelector('.exercise-select').value.trim();
-      if (!exercise) return;
+    if (!useQuickEntry) {
+      Array.from(els.entryBody.querySelectorAll('tr')).forEach((tr, index) => {
+        const exercise = tr.querySelector('.exercise-select').value.trim();
+        if (!exercise) return;
 
-      const variation = tr.querySelector('.variation-input').value.trim();
-      const setNumber = valueOrBlank(tr.querySelector('.set-input').value);
-      const loadRaw = tr.querySelector('.load-input').value.trim();
-      const loadUnit = getRowLoadUnit(tr.querySelector('.load-unit-select'));
-      const repsRaw = tr.querySelector('.reps-input').value.trim();
-      const tempo = tr.querySelector('.tempo-input').value.trim().toUpperCase();
-      const rpe = valueOrBlank(tr.querySelector('.rpe-input').value);
-      const rest = valueOrBlank(tr.querySelector('.rest-input').value);
-      const prFlag = tr.querySelector('.pr-select').value;
-      const notes = tr.querySelector('.notes-input').value.trim();
+        const variation = tr.querySelector('.variation-input').value.trim();
+        const setNumber = valueOrBlank(tr.querySelector('.set-input').value);
+        const loadRaw = tr.querySelector('.load-input').value.trim();
+        const loadUnit = getRowLoadUnit(tr.querySelector('.load-unit-select'));
+        const repsRaw = tr.querySelector('.reps-input').value.trim();
+        const tempo = tr.querySelector('.tempo-input').value.trim().toUpperCase();
+        const rpe = valueOrBlank(tr.querySelector('.rpe-input').value);
+        const rest = valueOrBlank(tr.querySelector('.rest-input').value);
+        const prFlag = tr.querySelector('.pr-select').value;
+        const notes = tr.querySelector('.notes-input').value.trim();
 
-      if (!setNumber) errors.push(`Row ${index + 1}: enter a set number.`);
-      if (!loadRaw) errors.push(`Row ${index + 1}: enter load. Use BW or 0 for bodyweight if needed.`);
-      if (!repsRaw) errors.push(`Row ${index + 1}: enter reps.`);
+        if (!setNumber) errors.push(`Row ${index + 1}: enter a set number.`);
+        if (!loadRaw) errors.push(`Row ${index + 1}: enter load. Use BW or 0 for bodyweight if needed.`);
+        if (!repsRaw) errors.push(`Row ${index + 1}: enter reps.`);
 
-      const load = convertLoadToKg(loadRaw, loadUnit);
-      const reps = coerceCellValue(repsRaw);
-      const finalTempo = tempo;
-      const numericLoad = typeof load === 'number' ? load : null;
-      const numericReps = strictNumber(repsRaw);
-      const volume = numericLoad !== null && numericReps !== null ? round(numericLoad * numericReps, 2) : '';
-      const e1rm = numericLoad !== null && numericReps !== null ? round(numericLoad * (1 + numericReps / 30), 2) : '';
-      const notesWithLoad = formatEnteredLoadNote(loadRaw, loadUnit);
+        const load = convertLoadToKg(loadRaw, loadUnit);
+        const reps = coerceCellValue(repsRaw);
+        const finalTempo = tempo;
+        const numericLoad = typeof load === 'number' ? load : null;
+        const numericReps = strictNumber(repsRaw);
+        const volume = numericLoad !== null && numericReps !== null ? round(numericLoad * numericReps, 2) : '';
+        const e1rm = numericLoad !== null && numericReps !== null ? round(numericLoad * (1 + numericReps / 30), 2) : '';
+        const notesWithLoad = formatEnteredLoadNote(loadRaw, loadUnit);
 
-      rows.push([
-        date,
-        workoutSessionLabel,
-        exercise,
-        variation,
-        setNumber,
-        load,
-        reps,
-        finalTempo,
-        rpe,
-        rest,
-        bodyweight,
-        volume,
-        e1rm,
-        prFlag,
-        [notes, notesWithLoad].filter(Boolean).join(' | ')
-      ]);
-
-      if (prFlag === 'Y' && numericLoad !== null && numericReps !== null) {
-        prCandidates.push({
-          exercise,
-          load: numericLoad,
-          reps: numericReps,
+        rows.push([
           date,
-          tempo: finalTempo,
-          score: e1rm || numericLoad
-        });
-      }
-    });
+          workoutSessionLabel,
+          exercise,
+          variation,
+          setNumber,
+          load,
+          reps,
+          finalTempo,
+          rpe,
+          rest,
+          bodyweight,
+          volume,
+          e1rm,
+          prFlag,
+          [notes, notesWithLoad].filter(Boolean).join(' | ')
+        ]);
 
-    // Third pass: process quick cards
-    if (els.quickEntryList) {
+        if (prFlag === 'Y' && numericLoad !== null && numericReps !== null) {
+          prCandidates.push({
+            exercise,
+            load: numericLoad,
+            reps: numericReps,
+            date,
+            tempo: finalTempo,
+            score: e1rm || numericLoad
+          });
+        }
+      });
+    }
+
+    if (useQuickEntry && els.quickEntryList) {
       Array.from(els.quickEntryList.querySelectorAll('.quick-card')).forEach((card, cardIndex) => {
         const variation = card.querySelector('.quick-variation-input').value.trim();
         const tempoValue = card.querySelector('.quick-tempo-input').value.trim().toUpperCase();
@@ -1644,7 +1766,7 @@
 
         const primarySection = card.querySelector('[data-role="primary"]');
         const primaryExercise = primarySection ? primarySection.querySelector('.quick-exercise-select').value.trim() : '';
-            const primarySetRows = primarySection ? collectQuickSetDataFromList(primarySection.querySelector('.quick-set-list')) : [];
+        const primarySetRows = primarySection ? collectQuickSetDataFromList(primarySection.querySelector('.quick-set-list')) : [];
         const secondarySection = card.querySelector('.quick-superset-section');
         const secondaryExercise = secondarySection && secondarySection.style.display !== 'none' ? secondarySection.querySelector('.quick-exercise-select').value.trim() : '';
         const secondarySetRows = secondarySection && secondarySection.style.display !== 'none' ? collectQuickSetDataFromList(secondarySection.querySelector('.quick-set-list')) : [];
@@ -1825,8 +1947,8 @@
         <span class="meta-line"></span>
       </td>
       <td><input class="variation-input" type="text" placeholder="Optional" aria-label="Variation"></td>
-      <td><input class="set-input compact-input" type="number" min="1" step="1" aria-label="Set"></td>
-      <td><div class="load-control"><input class="load-input compact-input" type="number" min="0" step="0.1" inputmode="decimal" placeholder="kg" aria-label="Load kg"><select class="load-unit-select compact-select" aria-label="Load unit"><option value="kg">kg</option><option value="lb">lb</option></select></div></td>
+      <td><input class="set-input compact-input" type="text" inputmode="text" placeholder="1 / 1-D1" aria-label="Set"></td>
+      <td><div class="load-control"><input class="load-input compact-input" type="text" inputmode="decimal" placeholder="kg/BW" aria-label="Load"><select class="load-unit-select compact-select" aria-label="Load unit"><option value="kg">kg</option><option value="lb">lb</option></select></div></td>
       <td><input class="reps-input compact-input" inputmode="decimal" placeholder="reps" aria-label="Reps"></td>
       <td><input class="tempo-input compact-input" type="text" placeholder="31X0" aria-label="Tempo"></td>
       <td><input class="rpe-input compact-input" type="number" min="1" max="10" step="0.5" placeholder="RPE" aria-label="RPE"></td>
@@ -2194,7 +2316,7 @@
       prTracker: 'PR_Tracker!B5:L300',
       log: 'Log!B5:P5000',
       appendLog: 'Log!B4:P',
-      programmedWorkouts: 'Programmed_Workouts!A2:N1000'
+      programmedWorkouts: 'Programmed_Workouts!B6:L1000'
     }, CONFIG.RANGES || {});
   }
 
@@ -2239,6 +2361,7 @@
       els.authorizeBtn,
       els.loadSheetBtn,
       els.forgetSheetBtn,
+      els.loadProgrammedTopBtn,
       els.addRowBtn,
       els.addFiveRowsBtn,
       els.clearRowsBtn,

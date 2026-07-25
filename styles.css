@@ -69,6 +69,16 @@ button.primary:hover {
   background: var(--accent-dark);
 }
 
+button.secondary {
+  background: #e8eef8;
+  color: #173f6d;
+  border: 1px solid #c8d7eb;
+}
+
+button.secondary:hover {
+  background: #dce7f5;
+}
+
 button.ghost {
   background: var(--soft);
   color: var(--ink);
@@ -143,6 +153,26 @@ main {
 .meta-panel p {
   color: var(--muted);
   margin-bottom: 0;
+}
+
+.program-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  margin: 8px 0 0;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.program-status.loaded {
+  border-color: rgba(2, 122, 72, 0.25);
+  background: #ecfdf3;
+  color: var(--success);
 }
 
 .status-pill {
@@ -504,14 +534,6 @@ th:first-child {
   }
 
   .top-actions {
-    margin-top: 12px;
-  }
-
-  .top-actions button:first-child {
-    display: none;
-  }
-
-  .top-actions button:last-child {
     display: none;
   }
 
